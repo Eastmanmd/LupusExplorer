@@ -27,11 +27,33 @@
     <button class="tab active" role="tab" data-view="genes" aria-selected="true">Gene leaderboard</button>
     <button class="tab" role="tab" data-view="pathways" aria-selected="false">Pathways</button>
     <button class="tab" role="tab" data-view="compare" aria-selected="false">Compare trends</button>
+    <button class="tab" role="tab" data-view="about" aria-selected="false">About</button>
   </nav>
 
   <section id="view-genes" class="view" role="tabpanel"></section>
   <section id="view-pathways" class="view" role="tabpanel" hidden></section>
   <section id="view-compare" class="view" role="tabpanel" hidden></section>
+  <section id="view-about" class="view" role="tabpanel" hidden>
+    <div id="about-dynamic"></div>
+    <!-- Edit your bio below — this card is plain HTML, no JavaScript involved. -->
+    <div class="card" id="about-compiler">
+      <h2>About the compiler</h2>
+      <p><strong>Ali Eastman Oku</strong> is a Computational Biologist at the New York Genome
+        Center with dual Master's degrees in Computer Science and Biology. Ali specializes in
+        engineering robust computational pipelines and web-based tools that translate complex
+        multi-omic data into actionable insights for human disease research, and is driven by
+        open science, translational genomics, and building intuitive platforms that accelerate
+        target and biomarker discovery.</p>
+      <p class="sub">
+        <a href="https://www.linkedin.com/in/ali-eastman-oku/" rel="noopener">LinkedIn</a>
+        · <a href="https://github.com/Eastmanmd" rel="noopener">GitHub</a>
+        · <a href="https://github.com/Eastmanmd/LupusExplorer" rel="noopener">Project repository</a>
+      </p>
+      <p class="sub">This site aggregates public research data and is provided as a research
+        aid only — it is not medical advice. If you have lupus or think you might,
+        please talk to a rheumatologist.</p>
+    </div>
+  </section>
   <section id="view-detail" class="view" hidden></section>
 
   <div id="loading" class="loading">Loading data…</div>

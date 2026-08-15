@@ -209,6 +209,17 @@ tr.gene-row:hover td, tr.gene-row:focus-within td { background: var(--wash); }
 .table-toggle { background: none; border: none; color: var(--series-1); font: inherit; font-size: 13px; cursor: pointer; padding: 0; }
 .table-toggle:hover { text-decoration: underline; }
 
+/* ---- about ---- */
+.callout-line { stroke: var(--baseline); stroke-width: 1; }
+.callout-title { fill: var(--ink); font-size: 13px; font-weight: 600; }
+.callout-sub { fill: var(--ink-2); font-size: 11.5px; }
+.donut-center { fill: var(--ink); font-size: 22px; font-weight: 600; }
+.about-h3 { font-size: 14px; margin: 18px 0 6px; }
+.about-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; align-items: start; }
+.donut-box { max-width: 280px; }
+.legend-stack { flex-direction: column; gap: 4px; }
+@media (max-width: 720px) { .about-grid { grid-template-columns: 1fr; } }
+
 .loading { text-align: center; color: var(--muted); padding: 60px 0; }
 .site-footer { color: var(--muted); font-size: 12.5px; padding: 24px 20px 40px; }
 .muted { color: var(--muted); }

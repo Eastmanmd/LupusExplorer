@@ -204,9 +204,14 @@ def main():
                                       key=lambda a: -(a["year"] or 0))}, f)
     with open(os.path.join(config.DATA_DIR, "pathways.json"), "w") as f:
         json.dump({"pathways": pathways}, f)
+    corpus_year_counts = defaultdict(int)
+    for a in articles.values():
+        if a["year"] and 1950 <= a["year"] <= max_year:
+            corpus_year_counts[a["year"]] += 1
     with open(os.path.join(config.DATA_DIR, "meta.json"), "w") as f:
         json.dump({
             "updated": datetime.date.today().isoformat(),
+            "corpus_year_counts": dict(sorted(corpus_year_counts.items())),
             "query": config.PUBMED_QUERY,
             "corpus_articles": len(articles),
             "genes_ranked": len(genes),

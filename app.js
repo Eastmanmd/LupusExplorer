@@ -575,6 +575,143 @@ function compareTable(seriesList) {
       ...seriesList.map(s => el("td", { class: "num" }, fmt(s.yearCounts[y] || 0)))))));
 }
 
+/* ---------- about ---------- */
+const BODY_CALLOUTS = [
+  // [side, labelY, dotX, dotY, title, fact]
+  ["left", 46, 354, 46, "Brain & nerves", "Headaches, brain fog; neuropsychiatric lupus in a subset"],
+  ["left", 150, 352, 122, "Heart & lungs", "Pericarditis, pleuritis; raised cardiovascular risk"],
+  ["left", 254, 344, 176, "Kidneys", "Lupus nephritis in up to ~50% — a major driver of severe disease"],
+  ["right", 84, 372, 60, "Skin", "Butterfly (malar) rash, photosensitivity — ~2 in 3 have skin disease"],
+  ["right", 188, 406, 150, "Blood", "Anemia, low white cells or platelets; clotting antibodies"],
+  ["right", 296, 376, 284, "Joints", "Arthritis or joint pain in ~9 in 10, usually non-erosive"],
+];
+
+function bodyDiagram() {
+  const W = 720, H = 440;
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img",
+    "aria-label": "Diagram of the human body showing organ systems lupus commonly affects: " +
+      BODY_CALLOUTS.map(c => `${c[4]} — ${c[5]}`).join("; ") });
+  // Stylized front-facing figure built from simple shapes, centered at x=360
+  const bodyAttrs = { fill: "var(--grid)", stroke: "var(--baseline)", "stroke-width": 1 };
+  svg.append(
+    svgEl("circle", { cx: 360, cy: 52, r: 24, ...bodyAttrs }),                                // head
+    svgEl("rect", { x: 351, y: 72, width: 18, height: 14, ...bodyAttrs }),                    // neck
+    svgEl("rect", { x: 328, y: 84, width: 64, height: 116, rx: 20, ...bodyAttrs }),           // torso
+    svgEl("rect", { x: 302, y: 90, width: 18, height: 100, rx: 9, ...bodyAttrs }),            // left arm
+    svgEl("rect", { x: 400, y: 90, width: 18, height: 100, rx: 9, ...bodyAttrs }),            // right arm
+    svgEl("rect", { x: 331, y: 196, width: 26, height: 178, rx: 11, ...bodyAttrs }),          // left leg
+    svgEl("rect", { x: 363, y: 196, width: 26, height: 178, rx: 11, ...bodyAttrs }),          // right leg
+  );
+  for (const [side, labelY, dotX, dotY, title, fact] of BODY_CALLOUTS) {
+    const labelX = side === "left" ? 232 : 488;
+    const anchor = side === "left" ? "end" : "start";
+    svg.append(
+      svgEl("line", { class: "callout-line", x1: labelX + (side === "left" ? 8 : -8),
+        y1: labelY - 4, x2: dotX, y2: dotY }),
+      svgEl("circle", { cx: dotX, cy: dotY, r: 5, fill: "var(--series-1)",
+        stroke: "var(--surface)", "stroke-width": 2 }),
+      svgEl("text", { class: "callout-title", x: labelX, y: labelY - 8, "text-anchor": anchor }, title),
+    );
+    // wrap the fact over up to two lines of ~34 chars
+    const words = fact.split(" ");
+    const lines = [""];
+    for (const word of words) {
+      if ((lines.at(-1) + " " + word).trim().length > 36) lines.push(word);
+      else lines[lines.length - 1] = (lines.at(-1) + " " + word).trim();
+    }
+    lines.forEach((line, i) => svg.append(
+      svgEl("text", { class: "callout-sub", x: labelX, y: labelY + 8 + i * 15,
+        "text-anchor": anchor }, line)));
+  }
+  return el("div", { class: "chart-box" }, svg);
+}
+
+function donutChart(slices, centerLabel) {
+  const W = 260, H = 220, cx = 110, cy = 104, r = 78, inner = 48;
+  const total = slices.reduce((s, d) => s + d.value, 0);
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img",
+    "aria-label": slices.map(d => `${d.label}: ${d.value}`).join(", ") });
+  let angle = -Math.PI / 2;
+  for (const d of slices) {
+    const sweep = (d.value / total) * 2 * Math.PI;
+    const a0 = angle, a1 = angle + sweep;
+    angle = a1;
+    const large = sweep > Math.PI ? 1 : 0;
+    const p = (a, rad) => `${cx + rad * Math.cos(a)},${cy + rad * Math.sin(a)}`;
+    const path = svgEl("path", {
+      d: `M${p(a0, r)} A${r},${r} 0 ${large} 1 ${p(a1, r)} L${p(a1, inner)} ` +
+         `A${inner},${inner} 0 ${large} 0 ${p(a0, inner)} Z`,
+      fill: d.color, stroke: "var(--surface)", "stroke-width": 2,
+    });
+    path.addEventListener("pointermove", ev =>
+      showTooltip(ev.clientX, ev.clientY, d.label, [
+        { value: fmt(d.value), label: `terms (${Math.round((d.value / total) * 100)}%)`, color: d.color }]));
+    path.addEventListener("pointerleave", hideTooltip);
+    svg.append(path);
+  }
+  svg.append(
+    svgEl("text", { class: "donut-center", x: cx, y: cy - 2, "text-anchor": "middle" }, fmt(total)),
+    svgEl("text", { class: "tick-label", x: cx, y: cy + 14, "text-anchor": "middle" }, centerLabel));
+  return el("div", { class: "chart-box donut-box" },
+    svg,
+    el("div", { class: "legend legend-stack" }, ...slices.map(d =>
+      el("span", {}, el("span", { class: "swatch", style: `background:${d.color}` }),
+        `${d.label} (${fmt(d.value)})`))));
+}
+
+function renderAboutView() {
+  const dyn = document.getElementById("about-dynamic");
+  const evidenceCounts = EVIDENCE_TYPES.map(([id, label]) => ({
+    label, count: state.genes.filter(g => (g.ot_datatypes[id] || 0) > 0).length,
+  }));
+  const maxEvidence = Math.max(...evidenceCounts.map(d => d.count), 1);
+  const termCounts = ["GO:BP", "KEGG", "REAC"].map(s => ({
+    label: SOURCE_LABELS[s], color: SOURCE_COLORS[s],
+    value: state.pathways.filter(t => t.source === s).length,
+  }));
+
+  dyn.replaceChildren(
+    el("div", { class: "card" },
+      el("h2", {}, "What is lupus?"),
+      el("p", {}, "Systemic lupus erythematosus (SLE) is a chronic autoimmune disease: the immune ",
+        "system loses tolerance to the body's own DNA and nuclear proteins, forms autoantibodies, ",
+        "and the resulting immune complexes and interferon-driven inflammation damage tissue ",
+        "throughout the body. It runs a relapsing–remitting course of flares and remission, and its ",
+        "severity ranges from manageable skin and joint disease to organ-threatening kidney, heart, ",
+        "or brain involvement. There is no cure yet, but modern treatment has transformed outcomes — ",
+        "and the genetics tracked on this site is where much of the next generation of therapies is coming from.")),
+    el("div", { class: "kpi-row" },
+      statTile("People affected worldwide", "≈3.4M", "adults and children, all regions"),
+      statTile("Female : male ratio", "9 : 1", "most often women of childbearing age"),
+      statTile("Typical age at onset", "15–44", "years old"),
+      statTile("Develop kidney disease", "≈50%", "lupus nephritis, the most feared complication")),
+    el("div", { class: "card" },
+      el("h2", {}, "How lupus affects the body"),
+      el("p", { class: "sub" }, "Common organ-system involvement; percentages are approximate lifetime figures from clinical cohorts."),
+      bodyDiagram()),
+    el("div", { class: "card" },
+      el("h2", {}, "Where this site's data comes from"),
+      el("p", { class: "sub" },
+        `Everything on this site is computed from public sources: ${fmt(state.meta.corpus_articles)} ` +
+        "PubMed articles matching the lupus query, PubTator 3 gene annotations over that corpus, " +
+        "Open Targets association evidence, and g:Profiler pathway enrichment. Refreshed weekly."),
+      el("h3", { class: "about-h3" }, "Lupus articles per year (the full corpus)"),
+      yearColumnChart(state.meta.corpus_year_counts, { label: "Lupus articles per year" }),
+      el("div", { class: "about-grid" },
+        el("div", {},
+          el("h3", { class: "about-h3" }, "Top-300 genes by Open Targets evidence class"),
+          el("p", { class: "sub" }, "Genes usually carry several classes at once, so rows overlap by design."),
+          ...evidenceCounts.map(d => el("div", { class: "breakdown-row" },
+            el("span", {}, d.label),
+            el("div", { class: "track" },
+              el("div", { class: "fill", style: `width:${(d.count / maxEvidence) * 100}%;background:var(--series-1)` })),
+            el("span", { class: "num" }, fmt(d.count))))),
+        el("div", {},
+          el("h3", { class: "about-h3" }, "Enriched pathway terms by database"),
+          donutChart(termCounts, "terms")))),
+  );
+}
+
 /* ---------- view switching ---------- */
 function switchView(name, { keepHash } = {}) {
   for (const tab of document.querySelectorAll(".tab")) {
@@ -582,13 +719,14 @@ function switchView(name, { keepHash } = {}) {
     tab.classList.toggle("active", active);
     tab.setAttribute("aria-selected", String(active));
   }
-  for (const v of ["genes", "pathways", "compare", "detail"]) {
+  for (const v of ["genes", "pathways", "compare", "about", "detail"]) {
     document.getElementById(`view-${v}`).hidden = v !== name;
   }
   if (!keepHash) history.replaceState(null, "", location.pathname + location.search);
   if (name === "genes") renderGenesView();
   if (name === "pathways") renderPathwaysView();
   if (name === "compare") renderCompareView();
+  if (name === "about") renderAboutView();
 }
 
 /* ---------- boot ---------- */
