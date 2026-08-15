@@ -68,7 +68,18 @@ a:hover { text-decoration: underline; }
 .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
 
 .site-header { padding: 28px 0 8px; }
-.site-header h1 { margin: 0; font-size: 26px; }
+.site-header h1 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  /* Wordmark only — the rest of the UI stays in the system sans. */
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.site-header .logo { width: 38px; height: 38px; flex: none; }
 .tagline { margin: 4px 0 0; color: var(--ink-2); }
 .intro { margin: 10px 0 0; color: var(--ink-2); font-size: 13.5px; max-width: 860px; }
 .provenance { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
