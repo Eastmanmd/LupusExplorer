@@ -106,23 +106,76 @@ function showTooltip(x, y, title, rows) {
 function hideTooltip() { tooltip.hidden = true; }
 
 /* ---------- charts ---------- */
-function sparkline(gene, width = 110, height = 26) {
+const SPARK_START = 1990;   // full modern publication history, so a gene's peak
+                            // era is visible rather than cropped out
+
+function sparkline(gene, width = 118, height = 26) {
   const end = state.meta.max_year;
-  const start = end - 11;
   const values = [];
-  for (let y = start; y <= end; y++) values.push(gene.year_counts[y] || 0);
+  for (let y = SPARK_START; y <= end; y++) values.push(gene.year_counts[y] || 0);
   const max = Math.max(...values, 1);
+  const peakIndex = values.indexOf(max);
   const px = i => 2 + (i * (width - 8)) / (values.length - 1);
   const py = v => height - 3 - (v * (height - 8)) / max;
   const d = values.map((v, i) => `${i ? "L" : "M"}${px(i).toFixed(1)},${py(v).toFixed(1)}`).join("");
   const svg = svgEl("svg", { viewBox: `0 0 ${width} ${height}`, width, height,
-    role: "img", "aria-label": `Papers per year, ${start}–${end}: ${values.join(", ")}` });
+    role: "img",
+    "aria-label": `Papers per year ${SPARK_START}–${end}, peak ${SPARK_START + peakIndex}: ${values.join(", ")}` });
   svg.append(
     svgEl("path", { d, fill: "none", stroke: "var(--muted)", "stroke-width": 1.5,
       "stroke-linejoin": "round", "stroke-linecap": "round" }),
-    svgEl("circle", { cx: px(values.length - 1), cy: py(values.at(-1)), r: 2.5, fill: "var(--series-1)" }),
+    // peak marker shows *when* the gene was hottest — the historical/recent tell
+    svgEl("circle", { cx: px(peakIndex), cy: py(max), r: 2.5, fill: "none",
+      stroke: "var(--muted)", "stroke-width": 1.5 }),
+    svgEl("circle", { cx: px(values.length - 1), cy: py(values.at(-1)), r: 2.5,
+      fill: "var(--series-1)" }),
   );
   return svg;
+}
+
+/* Literature velocity: last 5 years vs the 5 before, as a labelled archetype. */
+const TREND_LABEL = { surging: "surging", declining: "declining", steady: "steady" };
+function trendTag(g) {
+  const trend = g.trend || "steady";
+  const velocity = g.velocity;
+  const tag = el("span", { class: `trend-tag trend-${trend}` },
+    trend === "surging" ? "▲ surging" : trend === "declining" ? "▼ declining" : "steady");
+  tag.addEventListener("pointermove", ev =>
+    showTooltip(ev.clientX, ev.clientY,
+      `Literature velocity — ${TREND_LABEL[trend]}`, [
+        { value: `${velocity}×`, label: "last 5 yrs vs the 5 before" },
+        ...(g.peak_year ? [{ value: String(g.peak_year), label: "peak year" }] : []),
+      ]));
+  tag.addEventListener("pointerleave", hideTooltip);
+  return tag;
+}
+
+/* Most advanced clinical stage of any SLE drug against this target. */
+const STAGE_BADGE = {
+  APPROVAL: ["Approved", "stage-approved"],
+  PHASE_3: ["Phase 3", "stage-3"],
+  PHASE_2_3: ["Phase 2/3", "stage-3"],
+  PHASE_2: ["Phase 2", "stage-2"],
+  PHASE_1_2: ["Phase 1/2", "stage-2"],
+  PHASE_1: ["Phase 1", "stage-1"],
+  PRECLINICAL: ["Preclinical", "stage-1"],
+};
+function drugBadge(g) {
+  const stage = g.drug_stage;
+  if (!stage) return null;
+  const [label, cls] = STAGE_BADGE[stage] || [stage.toLowerCase(), "stage-1"];
+  const badge = el("span", { class: `badge drug-badge ${cls}` }, label);
+  const drugs = (g.drugs || []).slice(0, 4);
+  if (drugs.length) {
+    badge.addEventListener("pointermove", ev =>
+      showTooltip(ev.clientX, ev.clientY, "SLE drugs against this target",
+        drugs.map(d => ({
+          value: d.drug,
+          label: (STAGE_BADGE[d.stage] || [d.stage])[0] + (d.action ? ` · ${d.action}` : ""),
+        }))));
+    badge.addEventListener("pointerleave", hideTooltip);
+  }
+  return badge;
 }
 
 /* Evidence heat strip: one cell per Open Targets datatype, shaded by score. */
@@ -350,7 +403,8 @@ function statTile(label, value, sub) {
 }
 
 /* ---------- gene leaderboard ---------- */
-const genesFilter = { q: "", risingOnly: false, geneticOnly: false, drugOnly: false, rnaOnly: false };
+const genesFilter = { q: "", surgingOnly: false, hasDrugOnly: false,
+                      risingOnly: false, geneticOnly: false, rnaOnly: false };
 
 /* Weight sliders. Raw slider positions are independent 0–100; the weights they
    produce are normalized to sum to 1 so scores stay on the documented 0–100
@@ -423,9 +477,10 @@ function renderGenesView() {
     weightPanel(),
     el("div", { class: "filter-row" },
       search,
+      check("surgingOnly", "Surging"),
+      check("hasDrugOnly", "In the clinic"),
       check("risingOnly", "Rising"),
       check("geneticOnly", "Genetic"),
-      check("drugOnly", "Drug target"),
       check("rnaOnly", "RNA evidence"),
       el("span", { class: "count", id: "gene-count" })),
     el("div", { class: "card" },
@@ -439,7 +494,7 @@ function renderGenesView() {
           el("th", {}, "Combined score"),
           el("th", { class: "num" }, "Papers"),
           el("th", { class: "num" }, "Last 5 yr"),
-          el("th", {}, `Trend ${state.meta.max_year - 11}–${state.meta.max_year}`),
+          el("th", {}, `Trend ${SPARK_START}–${state.meta.max_year}`),
           el("th", {}, "Evidence"))),
         el("tbody", { id: "gene-tbody" }))),
   );
@@ -448,29 +503,23 @@ function renderGenesView() {
 
 function renderGeneTable() {
   const q = genesFilter.q.trim().toLowerCase();
-  const anyEvidenceFilter = genesFilter.risingOnly || genesFilter.geneticOnly
-    || genesFilter.drugOnly || genesFilter.rnaOnly;
-  const rows = state.ranked.filter(g => {
+  // Velocity and clinical stage ride on every pool record; the Open Targets
+  // evidence flags exist only for genes with a full detail payload.
+  const needsDetail = genesFilter.risingOnly || genesFilter.geneticOnly || genesFilter.rnaOnly;
+  const matches = g => {
     if (q && !g.symbol.toLowerCase().includes(q) && !g.name.toLowerCase().includes(q)) return false;
-    // Evidence flags only exist for genes with a full detail payload.
-    if (!anyEvidenceFilter) return true;
+    if (genesFilter.surgingOnly && g.trend !== "surging") return false;
+    if (genesFilter.hasDrugOnly && !g.drug_stage) return false;
+    if (!needsDetail) return true;
     const d = g.detail;
     if (!d) return false;
     return (!genesFilter.risingOnly || d.rising)
       && (!genesFilter.geneticOnly || d.ot_genetic >= 0.2)
-      && (!genesFilter.drugOnly || (d.ot_datatypes.clinical || 0) > 0)
       && (!genesFilter.rnaOnly || (d.ot_datatypes.rna_expression || 0) > 0);
-  }).slice(0, 300);
-
-  const total = state.ranked.filter(g => {
-    if (q && !g.symbol.toLowerCase().includes(q) && !g.name.toLowerCase().includes(q)) return false;
-    if (!anyEvidenceFilter) return true;
-    const d = g.detail;
-    return d && (!genesFilter.risingOnly || d.rising)
-      && (!genesFilter.geneticOnly || d.ot_genetic >= 0.2)
-      && (!genesFilter.drugOnly || (d.ot_datatypes.clinical || 0) > 0)
-      && (!genesFilter.rnaOnly || (d.ot_datatypes.rna_expression || 0) > 0);
-  }).length;
+  };
+  const matched = state.ranked.filter(matches);
+  const rows = matched.slice(0, 300);
+  const total = matched.length;
   document.getElementById("gene-count").textContent =
     total > rows.length ? `showing top ${rows.length} of ${fmt(total)} genes` : `${fmt(total)} genes`;
 
@@ -480,7 +529,7 @@ function renderGeneTable() {
       el("p", {}, "No genes match these filters."),
       el("button", { class: "back-btn", onclick: () => {
         genesFilter.q = "";
-        for (const k of ["risingOnly", "geneticOnly", "drugOnly", "rnaOnly"]) genesFilter[k] = false;
+        for (const k of ["surgingOnly", "hasDrugOnly", "risingOnly", "geneticOnly", "rnaOnly"]) genesFilter[k] = false;
         renderGenesView();
       } }, "Clear filters"))));
     return;
@@ -501,10 +550,14 @@ function renderGeneTable() {
         el("span", { class: "val" }, g.score.toFixed(1)))),
       el("td", { class: "num" }, fmt(g.papers)),
       el("td", { class: "num" }, fmt(g.recent_papers)),
-      el("td", {}, g.detail ? sparkline(g.detail) : el("span", { class: "muted" }, "—")),
-      el("td", {},
+      el("td", {}, el("div", { class: "trend-cell" },
+        g.detail ? sparkline(g.detail) : el("span", { class: "muted spark-gap" }, "—"),
+        trendTag(g.detail ? { ...g, peak_year: g.detail.peak_year } : g))),
+      el("td", {}, el("div", { class: "evidence-cell-wrap" },
         g.detail ? evidenceStrip(g.detail) : null,
-        g.detail && g.detail.rising ? el("span", { class: "badge rising" }, "rising ↑") : null)),
+        drugBadge(g.detail ? { ...g, drugs: g.detail.drugs } : g),
+        g.detail && g.detail.rising ? el("span", { class: "badge rising" }, "rising ↑") : null))),
+
   ));
 }
 
@@ -552,8 +605,9 @@ function showDetail(symbol) {
       statTile("Combined score", (live ? live.score : g.score).toFixed(1),
         live ? `rank #${live.liveRank} of ${fmt(state.meta.genes_ranked)}` +
           (weightsAreDefault() ? "" : " · custom weights") : `rank #${g.rank}`),
-      statTile("Lupus papers", fmt(g.papers), "all years"),
-      statTile("Last 5 years", fmt(g.recent_papers), g.rising ? "rising ↑" : "papers since " + state.meta.recent_cutoff),
+      statTile("Lupus papers", fmt(g.papers), `all years · peak ${g.peak_year || "—"}`),
+      statTile("Velocity", `${g.velocity}×`,
+        `${g.trend} · ${fmt(g.recent_papers)} vs ${fmt(g.prior_papers)} papers`),
       statTile("Open Targets", g.ot_score.toFixed(2), `genetic ${g.ot_genetic.toFixed(2)}`)),
     el("div", { class: "card" },
       el("h2", {}, "Score breakdown"),
@@ -564,6 +618,7 @@ function showDetail(symbol) {
         el("div", { class: "track" }, el("div", { class: "fill", style: `width:${c.value * 100}%;background:${c.color}` })),
         el("span", { class: "num" }, c.value.toFixed(2))))),
     evidenceCard(g),
+    drugCard(g),
     el("div", { class: "card" },
       el("h2", {}, "Lupus papers mentioning " + g.symbol + " per year"),
       el("p", { class: "sub" }, "Gene mentions from PubTator 3 annotations across the lupus corpus."),
@@ -631,6 +686,31 @@ function showPoolDetail(symbol) {
   );
   switchView("detail", { keepHash: true });
   window.scrollTo({ top: 0 });
+}
+
+/* Drugs and clinical candidates targeting this gene in SLE. */
+function drugCard(g) {
+  const drugs = g.drugs || [];
+  if (!drugs.length) return null;
+  return el("div", { class: "card" },
+    el("h2", {}, "Drugs and clinical candidates"),
+    el("p", { class: "sub" },
+      `SLE drugs and trial candidates acting on ${g.symbol}, from Open Targets / ChEMBL. ` +
+      "Stage is the most advanced reached for lupus specifically."),
+    el("table", { class: "data" },
+      el("thead", {}, el("tr", {},
+        el("th", {}, "Drug"), el("th", {}, "Stage"),
+        el("th", {}, "Action"), el("th", {}, "Type"))),
+      el("tbody", {}, ...drugs.map(d => {
+        const [label, cls] = STAGE_BADGE[d.stage] || [d.stage, "stage-1"];
+        return el("tr", {},
+          el("td", {}, el("a", {
+            href: `https://platform.opentargets.org/search?q=${encodeURIComponent(d.drug)}`,
+            target: "_blank", rel: "noopener" }, d.drug)),
+          el("td", {}, el("span", { class: `badge drug-badge ${cls}` }, label)),
+          el("td", { class: "muted" }, d.action || "—"),
+          el("td", { class: "muted" }, (d.type || "").toLowerCase() || "—"));
+      }))));
 }
 
 /* Evidence sources card: one bar per Open Targets datatype, with the

@@ -9,6 +9,7 @@ STEPS = [
     "fetch_pmids.py",
     "fetch_pubtator.py",
     "fetch_opentargets.py",
+    "fetch_drugs.py",
     "build_data.py",       # first pass: ranks genes
     "enrich_pathways.py",  # needs genes.json from the pass above
     "build_data.py",       # second pass: folds enrichment in

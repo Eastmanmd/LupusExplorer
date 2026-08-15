@@ -98,8 +98,41 @@ is accelerating on them. TLR7 is the poster child — decades of moderate
 interest, then a surge after gain-of-function variants were shown to cause
 lupus. Evidence-class cells are slow, curated signals; *rising* is fast
 literature momentum — genes strong in both are usually the most interesting.
-The leaderboard can be filtered by any of these (Rising / Genetic / Drug
-target / RNA evidence).
+
+## Literature velocity
+
+Every row carries a **1990–2026 sparkline** with a hollow marker on the gene's
+peak year, so you can see at a glance whether a gene is climbing or past its
+prime. Beneath it, a **velocity** tag classifies the shape by comparing the
+last 5 years against the 5 before:
+
+- **▲ surging** (≥ 1.5×) — TYK2 is 2.7×, CD19 is 3.0×
+- **steady** (0.7–1.5×)
+- **▼ declining** (≤ 0.7×) — PTPN22 is 0.43× and peaked in 2005; STAT4 is
+  0.70× and peaked in 2010
+
+This is what separates the GWAS-era classics from today's hot targets: PTPN22
+and STAT4 have far more total papers than TYK2, but the field has moved on.
+Gene pages show the ratio, the peak year, and the raw counts behind it.
+
+## Druggability and clinical stage
+
+Genes with an SLE drug or trial candidate carry a **clinical-stage badge**
+(Approved / Phase 3 / Phase 2 / Phase 1, shaded darker the further along),
+sourced from Open Targets / ChEMBL — 51 of the top 300 genes. Hovering names
+the drugs; each gene page lists them in full with mechanism and action type:
+
+- **IFNAR1** → Anifrolumab (approved) · **TNFSF13B** → Belimumab (approved)
+- **TYK2** → Upadacitinib, Deucravacitinib (Phase 3)
+- **CD19** → Obexelimab, Inebilizumab (Phase 2) · **CD40LG** → Dapirolizumab pegol (Phase 3)
+
+**Filter by Surging + In the clinic** to get the genes that are both
+accelerating in the literature and already being drugged — 15 genes today,
+led by TYK2, CD19, JAK1, CD38, and CLEC4C. That combination is the most
+useful view in the tool.
+
+The leaderboard filters are Surging / In the clinic / Rising / Genetic /
+RNA evidence, and they combine.
 
 ---
 

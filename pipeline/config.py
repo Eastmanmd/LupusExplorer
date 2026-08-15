@@ -37,5 +37,6 @@ SCORE_WEIGHTS = {"mentions": 0.4, "recency": 0.3, "opentargets": 0.3}
 PMIDS_FILE = os.path.join(CACHE_DIR, "pmids.txt")
 MENTIONS_FILE = os.path.join(CACHE_DIR, "mentions.jsonl")
 OPENTARGETS_FILE = os.path.join(CACHE_DIR, "opentargets.json")
+DRUGS_FILE = os.path.join(CACHE_DIR, "drugs.json")
 GENE_INFO_FILE = os.path.join(CACHE_DIR, "gene_info.json")
 ENRICHMENT_FILE = os.path.join(CACHE_DIR, "enrichment.json")

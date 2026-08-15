@@ -89,6 +89,21 @@ def fetch_gene_info(gene_ids):
     return cache
 
 
+def classify_trend(total, velocity):
+    """Surging / steady / declining, from the 5-year-over-5-year ratio.
+
+    Genes with very little literature stay 'steady' — a jump from 1 paper to 3
+    is noise, not a trend.
+    """
+    if total < 15:
+        return "steady"
+    if velocity >= 1.5:
+        return "surging"
+    if velocity <= 0.7:
+        return "declining"
+    return "steady"
+
+
 def main():
     articles, gene_articles = load_mentions()
     years = [a["year"] for a in articles.values() if a["year"]]
@@ -123,6 +138,12 @@ def main():
 
     with open(config.OPENTARGETS_FILE) as f:
         opentargets = json.load(f)
+    drugs = {}
+    if os.path.exists(config.DRUGS_FILE):
+        with open(config.DRUGS_FILE) as f:
+            drugs = json.load(f)
+    else:
+        print("NOTE: no drug cache yet; run fetch_drugs.py for clinical badges")
 
     genes = []
     for key, group in groups.items():
@@ -138,8 +159,16 @@ def main():
                 year_counts[y] += 1
         total = len(pmid_set)
         recent = sum(c for y, c in year_counts.items() if y >= recent_cutoff)
+        # Velocity: share of papers in the last 5 years vs the 5 years before.
+        # >1 means attention is accelerating, <1 means the gene is past its peak.
+        prior_start = recent_cutoff - config.RECENT_YEARS
+        prior = sum(c for y, c in year_counts.items()
+                    if prior_start <= y < recent_cutoff)
+        velocity = (recent + 1) / (prior + 1)
+        peak_year = max(year_counts, key=lambda y: year_counts[y]) if year_counts else None
         human_gi = info[group["human"]]
         ot = opentargets.get(human_gi["symbol"], {})
+        drug = drugs.get(human_gi["symbol"], {})
         genes.append({
             "symbol": human_gi["symbol"],
             "name": human_gi["name"],
@@ -155,6 +184,12 @@ def main():
             "ot_datasources": {k: round(v, 3) for k, v in ot.get("datasources", {}).items()},
             "rising": (total >= 20 and
                        recent / total > 1.5 * corpus_recent_share),
+            "velocity": round(velocity, 2),
+            "prior_papers": prior,
+            "peak_year": peak_year,
+            "trend": classify_trend(total, velocity),
+            "drug_stage": drug.get("top_stage"),
+            "drugs": drug.get("drugs", []),
         })
 
     max_log = max(math.log1p(g["papers"]) for g in genes)
@@ -184,6 +219,9 @@ def main():
         "r": g["recency_norm"],
         "o": round(g["ot_score"], 4),
         "rank": g.get("rank"),        # default-weight rank; null outside the top N
+        "trend": g["trend"],
+        "velocity": g["velocity"],
+        "drug_stage": g["drug_stage"],
     } for g in genes]
 
     # Pathways: fold in enrichment results if present

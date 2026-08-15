@@ -20,6 +20,9 @@
   --heat-1: #b7d3f6;   /* sequential blue: low / mid / high */
   --heat-2: #5598e7;
   --heat-3: #184f95;
+  --seq-250: #86b6ef;  /* clinical-stage ramp, light → dark = further along */
+  --seq-350: #5598e7;
+  --seq-650: #104281;
   --organ-brain: #e87ba4;
   --organ-lung: #2a78d6;
   --organ-heart: #e34948;
@@ -48,6 +51,9 @@
     --heat-1: #184f95;   /* dark mode: low recedes toward surface, high brightens */
     --heat-2: #256abf;
     --heat-3: #6da7ec;
+    --seq-250: #1c5cab;
+    --seq-350: #256abf;
+    --seq-650: #9ec5f4;
     --organ-brain: #d55181;
     --organ-lung: #3987e5;
     --organ-heart: #e66767;
@@ -180,7 +186,34 @@ tr.gene-row:hover td, tr.gene-row:focus-within td { background: var(--wash); }
 .score-cell .bar-fill { height: 8px; border-radius: 4px; background: var(--series-1); }
 .score-cell .val { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 38px; text-align: right; }
 
-.evidence-strip { display: inline-flex; gap: 3px; vertical-align: middle; margin-right: 6px; }
+/* ---- literature velocity ---- */
+.trend-cell { display: flex; flex-direction: column; gap: 1px; }
+.trend-cell .spark-gap { height: 26px; display: flex; align-items: center; }
+.trend-tag { font-size: 11px; letter-spacing: 0.01em; cursor: default; }
+.trend-surging { color: var(--good-text); font-weight: 600; }
+.trend-declining { color: var(--muted); }
+.trend-steady { color: var(--muted); opacity: 0.65; }
+
+/* ---- clinical stage badges (sequential: darker = further along) ---- */
+/* Text colour is pinned per step so it always contrasts with its own fill —
+   the ramp inverts in dark mode, so the pairings flip with it. */
+/* Paired .badge.stage-* so these beat the base .badge colour regardless of
+   source order; the ramp inverts in dark mode, so the ink flips with it. */
+.badge.drug-badge { border: none; font-weight: 600; }
+.badge.stage-approved { background: var(--seq-650); color: #fcfcfb; }
+.badge.stage-3 { background: var(--seq-450); color: #fcfcfb; }
+.badge.stage-2 { background: var(--seq-350); color: #0b0b0b; }
+.badge.stage-1 { background: var(--seq-250); color: #0b0b0b; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .badge.stage-approved { color: #0b0b0b; }
+  :root:not([data-theme="light"]) .badge.stage-3 { color: #ffffff; }
+  :root:not([data-theme="light"]) .badge.stage-2 { color: #ffffff; }
+  :root:not([data-theme="light"]) .badge.stage-1 { color: #ffffff; }
+}
+
+.evidence-cell-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.evidence-cell-wrap .badge { margin-right: 0; }
+.evidence-strip { display: inline-flex; gap: 3px; vertical-align: middle; }
 .evidence-cell {
   width: 13px; height: 13px; border-radius: 3px;
   border: 1px solid var(--grid); background: none;
