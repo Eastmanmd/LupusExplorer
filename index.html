@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lupus Gene Tracker — literature-ranked genes &amp; pathways</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧬</text></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <h1>🧬 Lupus Gene Tracker</h1>
+    <p class="tagline">Genes ranked by systemic lupus erythematosus literature, updated from PubMed, PubTator&nbsp;3 and Open&nbsp;Targets</p>
+    <p class="provenance" id="provenance"></p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="kpi-row" id="kpi-row" aria-label="Corpus summary"></section>
+
+  <nav class="tabs" role="tablist" aria-label="Views">
+    <button class="tab active" role="tab" data-view="genes" aria-selected="true">Gene leaderboard</button>
+    <button class="tab" role="tab" data-view="pathways" aria-selected="false">Pathways</button>
+    <button class="tab" role="tab" data-view="compare" aria-selected="false">Compare trends</button>
+  </nav>
+
+  <section id="view-genes" class="view" role="tabpanel"></section>
+  <section id="view-pathways" class="view" role="tabpanel" hidden></section>
+  <section id="view-compare" class="view" role="tabpanel" hidden></section>
+  <section id="view-detail" class="view" hidden></section>
+
+  <div id="loading" class="loading">Loading data…</div>
+</main>
+
+<footer class="site-footer wrap">
+  <p>Data: <a href="https://pubmed.ncbi.nlm.nih.gov/" rel="noopener">PubMed</a> ·
+    <a href="https://www.ncbi.nlm.nih.gov/research/pubtator3/" rel="noopener">PubTator 3</a> gene annotations ·
+    <a href="https://platform.opentargets.org/" rel="noopener">Open Targets Platform</a> ·
+    enrichment via <a href="https://biit.cs.ut.ee/gprofiler/gost" rel="noopener">g:Profiler</a>
+    (GO-BP, KEGG, Reactome).
+    Combined score = 0.4·mentions + 0.3·recency + 0.3·Open&nbsp;Targets association.
+    Research aid only — not medical advice.</p>
+</footer>
+
+<div id="tooltip" class="tooltip" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

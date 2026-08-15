@@ -1,0 +1,5 @@
+# Pipeline intermediates (large; regenerated / cached by CI)
+cache/
+__pycache__/
+*.pyc
+.DS_Store

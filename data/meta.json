@@ -1,0 +1,1 @@
+{"updated": "2026-08-15", "query": "\"lupus erythematosus, systemic\"[MeSH] OR lupus[tiab]", "corpus_articles": 114172, "genes_ranked": 1505, "genes_shown": 300, "max_year": 2026, "recent_cutoff": 2022, "weights": {"mentions": 0.4, "recency": 0.3, "opentargets": 0.3}}
