@@ -1,4 +1,4 @@
-# 🧬 Lupus Gene Tracker
+# Lupus Gene Tracker
 
 A bioinformatics dashboard that ranks genes by how prominently they feature in
 systemic lupus erythematosus (SLE) research, with pathway enrichment
