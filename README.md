@@ -49,20 +49,32 @@ which top genes belong to it; each gene's page shows the reverse mapping.
 Top result, reassuringly: complement and coagulation cascades, interferon
 signaling, and Toll-like receptor cascades — the core biology of lupus.
 
-## Evidence badges
+## Evidence: where an association comes from
 
-- **genetic** — the gene's Open Targets *genetic association* component for
-  SLE is ≥ 0.2, meaning human genetics (GWAS and rare-variant evidence) links
-  it to the disease, not just publication volume.
-- **rising ↑** — the gene's share of papers in the last 5 years is at least
-  1.5× the corpus-wide baseline (minimum 20 papers total): the literature is
-  accelerating on this gene. TLR7 is the poster child — decades of moderate
-  interest, then a surge after gain-of-function variants were shown to cause
-  lupus.
+Each gene's row carries a five-cell **evidence strip** (darker = stronger
+Open Targets evidence; hover any cell for the score):
 
-The two badges are deliberately independent: *genetic* is slow, curated
-evidence; *rising* is fast, literature-momentum evidence. Genes carrying both
-are usually the most interesting.
+| Cell | Evidence class | Sources behind it |
+|---|---|---|
+| **Genetic** | Variant-level genetic association | GWAS credible sets, gene burden, ClinVar, UniProt variants |
+| **Curated genetics** | Expert-curated clinical genetics | Genomics England PanelApp, ClinGen, Orphanet, UniProt literature |
+| **RNA** | Differential expression in SLE | Expression Atlas |
+| **Drug** | Clinical precedence | A drug against this target reached the clinic for SLE |
+| **Model** | Animal-model evidence | IMPC mouse knockout phenotypes |
+
+Each gene's detail page expands the strip into a full **Evidence sources**
+panel naming every contributing database and its score, so you can see whether
+"genetic evidence" means a genome-wide association signal, a curated ClinVar
+variant, or both.
+
+Separately, a **rising ↑** badge marks genes whose share of papers in the last
+5 years is ≥ 1.5× the corpus-wide baseline (minimum 20 papers): the literature
+is accelerating on them. TLR7 is the poster child — decades of moderate
+interest, then a surge after gain-of-function variants were shown to cause
+lupus. Evidence-class cells are slow, curated signals; *rising* is fast
+literature momentum — genes strong in both are usually the most interesting.
+The leaderboard can be filtered by any of these (Rising / Genetic / Drug
+target / RNA evidence).
 
 ---
 

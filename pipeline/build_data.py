@@ -151,7 +151,8 @@ def main():
                 pmid_set, key=lambda p: articles[p]["year"] or 0, reverse=True),
             "ot_score": ot.get("score", 0.0),
             "ot_genetic": ot.get("datatypes", {}).get("genetic_association", 0.0),
-            "ot_literature": ot.get("datatypes", {}).get("literature", 0.0),
+            "ot_datatypes": {k: round(v, 3) for k, v in ot.get("datatypes", {}).items()},
+            "ot_datasources": {k: round(v, 3) for k, v in ot.get("datasources", {}).items()},
             "rising": (total >= 20 and
                        recent / total > 1.5 * corpus_recent_share),
         })

@@ -17,6 +17,7 @@ query sleAssociations($efoId: String!, $index: Int!) {
         target { id approvedSymbol }
         score
         datatypeScores { id score }
+        datasourceScores { id score }
       }
     }
   }
@@ -67,6 +68,7 @@ def main():
             "ensembl": row["target"]["id"],
             "score": row["score"],
             "datatypes": {d["id"]: d["score"] for d in row["datatypeScores"]},
+            "datasources": {d["id"]: d["score"] for d in row["datasourceScores"]},
         }
     with open(config.OPENTARGETS_FILE, "w") as f:
         json.dump(genes, f)

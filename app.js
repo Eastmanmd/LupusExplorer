@@ -14,6 +14,37 @@ const state = {
 };
 
 const SOURCE_LABELS = { "GO:BP": "GO Biological Process", KEGG: "KEGG", REAC: "Reactome" };
+/* Open Targets evidence datatypes shown in the heat strip, in fixed order */
+const EVIDENCE_TYPES = [
+  ["genetic_association", "Genetic", "Variant-level genetic association (GWAS credible sets, gene burden, ClinVar, UniProt variants)"],
+  ["genetic_literature", "Curated genetics", "Curated clinical-genetics literature (Genomics England PanelApp, ClinGen, Orphanet, UniProt)"],
+  ["rna_expression", "RNA", "Differential RNA expression in SLE (Expression Atlas)"],
+  ["clinical", "Drug", "Clinical precedence — a drug against this target reached the clinic for SLE"],
+  ["animal_model", "Model", "Mouse-model phenotypes mirroring SLE (IMPC)"],
+];
+const EXTRA_EVIDENCE_TYPES = [
+  ["literature", "Text mining", "Europe PMC literature text mining (overlaps this site's own mention counts)"],
+  ["somatic_mutation", "Somatic", "Somatic mutation evidence"],
+];
+const DATASOURCE_LABELS = {
+  gwas_credible_sets: "GWAS credible sets", gene_burden: "Gene burden (rare variants)",
+  eva: "ClinVar (EVA)", uniprot_literature: "UniProt literature", uniprot_variants: "UniProt variants",
+  genomics_england: "Genomics England PanelApp", clingen: "ClinGen", orphanet: "Orphanet",
+  expression_atlas: "Expression Atlas", impc: "IMPC mouse models",
+  clinical_precedence: "Clinical precedence (drugs)", europepmc: "Europe PMC text mining",
+  eva_somatic: "ClinVar somatic",
+};
+/* Grouping verified empirically against the fetched data (genes with a single
+   datasource pin their datatype) — matches Open Targets' 2026 taxonomy. */
+const DATATYPE_DATASOURCES = {
+  genetic_association: ["gwas_credible_sets", "gene_burden", "eva", "uniprot_variants"],
+  genetic_literature: ["uniprot_literature", "genomics_england", "clingen", "orphanet"],
+  rna_expression: ["expression_atlas"],
+  clinical: ["clinical_precedence"],
+  animal_model: ["impc"],
+  literature: ["europepmc"],
+  somatic_mutation: ["eva_somatic"],
+};
 const SOURCE_COLORS = { "GO:BP": "var(--series-1)", KEGG: "var(--series-2)", REAC: "var(--series-3)" };
 const SERIES_VARS = ["--series-1", "--series-2", "--series-3"];
 
@@ -77,6 +108,29 @@ function sparkline(gene, width = 110, height = 26) {
     svgEl("circle", { cx: px(values.length - 1), cy: py(values.at(-1)), r: 2.5, fill: "var(--series-1)" }),
   );
   return svg;
+}
+
+/* Evidence heat strip: one cell per Open Targets datatype, shaded by score. */
+function heatClass(score) {
+  if (score >= 0.66) return "h3";
+  if (score >= 0.33) return "h2";
+  if (score > 0) return "h1";
+  return "";
+}
+function evidenceStrip(gene) {
+  const strip = el("div", { class: "evidence-strip", role: "img",
+    "aria-label": "Open Targets evidence: " + EVIDENCE_TYPES.map(([id, label]) =>
+      `${label} ${(gene.ot_datatypes[id] || 0).toFixed(2)}`).join(", ") });
+  for (const [id, label, description] of EVIDENCE_TYPES) {
+    const score = gene.ot_datatypes[id] || 0;
+    const cell = el("span", { class: `evidence-cell ${heatClass(score)}` });
+    cell.addEventListener("pointermove", ev =>
+      showTooltip(ev.clientX, ev.clientY, description,
+        [{ value: score ? score.toFixed(2) : "—", label }]));
+    cell.addEventListener("pointerleave", hideTooltip);
+    strip.append(cell);
+  }
+  return strip;
 }
 
 function niceTicks(max, count = 4) {
@@ -229,23 +283,30 @@ function statTile(label, value, sub) {
 }
 
 /* ---------- gene leaderboard ---------- */
-const genesFilter = { q: "", risingOnly: false, geneticOnly: false };
+const genesFilter = { q: "", risingOnly: false, geneticOnly: false, drugOnly: false, rnaOnly: false };
 
 function renderGenesView() {
   const view = document.getElementById("view-genes");
   const search = el("input", { type: "search", placeholder: "Search gene symbol or name…",
     value: genesFilter.q, oninput: e => { genesFilter.q = e.target.value; renderGeneTable(); } });
-  const rising = el("input", { type: "checkbox", onchange: e => { genesFilter.risingOnly = e.target.checked; renderGeneTable(); } });
-  rising.checked = genesFilter.risingOnly;
-  const genetic = el("input", { type: "checkbox", onchange: e => { genesFilter.geneticOnly = e.target.checked; renderGeneTable(); } });
-  genetic.checked = genesFilter.geneticOnly;
+  const check = (key, label) => {
+    const box = el("input", { type: "checkbox",
+      onchange: e => { genesFilter[key] = e.target.checked; renderGeneTable(); } });
+    box.checked = genesFilter[key];
+    return el("label", { class: "check" }, box, label);
+  };
   view.replaceChildren(
     el("div", { class: "filter-row" },
       search,
-      el("label", { class: "check" }, rising, "Rising only"),
-      el("label", { class: "check" }, genetic, "Genetic evidence only"),
+      check("risingOnly", "Rising"),
+      check("geneticOnly", "Genetic"),
+      check("drugOnly", "Drug target"),
+      check("rnaOnly", "RNA evidence"),
       el("span", { class: "count", id: "gene-count" })),
     el("div", { class: "card" },
+      el("p", { class: "sub", style: "margin-bottom:8px" },
+        "Evidence strip (left → right): " + EVIDENCE_TYPES.map(([, l]) => l).join(" · ") +
+        " — darker = stronger Open Targets evidence; hover a cell for the score."),
       el("table", { class: "data" },
         el("thead", {}, el("tr", {},
           el("th", { class: "num" }, "#"),
@@ -265,7 +326,9 @@ function renderGeneTable() {
   const rows = state.genes.filter(g =>
     (!q || g.symbol.toLowerCase().includes(q) || g.name.toLowerCase().includes(q)) &&
     (!genesFilter.risingOnly || g.rising) &&
-    (!genesFilter.geneticOnly || g.ot_genetic >= 0.2));
+    (!genesFilter.geneticOnly || g.ot_genetic >= 0.2) &&
+    (!genesFilter.drugOnly || (g.ot_datatypes.clinical || 0) > 0) &&
+    (!genesFilter.rnaOnly || (g.ot_datatypes.rna_expression || 0) > 0));
   document.getElementById("gene-count").textContent = `${rows.length} genes`;
   const maxScore = state.genes[0].score;
   document.getElementById("gene-tbody").replaceChildren(...rows.map(g =>
@@ -284,7 +347,7 @@ function renderGeneTable() {
       el("td", { class: "num" }, fmt(g.recent_papers)),
       el("td", {}, sparkline(g)),
       el("td", {},
-        g.ot_genetic >= 0.2 ? el("span", { class: "badge genetic", title: `Open Targets genetic association ${g.ot_genetic.toFixed(2)}` }, "genetic") : null,
+        evidenceStrip(g),
         g.rising ? el("span", { class: "badge rising" }, "rising ↑") : null)),
   ));
 }
@@ -325,6 +388,7 @@ function showDetail(symbol) {
         el("span", {}, c.label),
         el("div", { class: "track" }, el("div", { class: "fill", style: `width:${c.value * 100}%;background:${c.color}` })),
         el("span", { class: "num" }, c.value.toFixed(2))))),
+    evidenceCard(g),
     el("div", { class: "card" },
       el("h2", {}, "Lupus papers mentioning " + g.symbol + " per year"),
       el("p", { class: "sub" }, "Gene mentions from PubTator 3 annotations across the lupus corpus."),
@@ -347,6 +411,35 @@ function showDetail(symbol) {
   );
   switchView("detail", { keepHash: true });
   window.scrollTo({ top: 0 });
+}
+
+/* Evidence sources card: one bar per Open Targets datatype, with the
+   contributing datasources named beneath. */
+function evidenceCard(g) {
+  const rows = [];
+  for (const [id, label, description] of [...EVIDENCE_TYPES, ...EXTRA_EVIDENCE_TYPES]) {
+    const score = g.ot_datatypes[id] || 0;
+    if (!score && EXTRA_EVIDENCE_TYPES.some(([xid]) => xid === id)) continue;
+    const sources = (DATATYPE_DATASOURCES[id] || [])
+      .filter(s => (g.ot_datasources[s] || 0) > 0)
+      .map(s => `${DATASOURCE_LABELS[s] || s} ${g.ot_datasources[s].toFixed(2)}`);
+    rows.push(el("div", { class: "evidence-row", title: description },
+      el("div", { class: "breakdown-row" },
+        el("span", {}, label),
+        el("div", { class: "track" },
+          el("div", { class: "fill", style: `width:${score * 100}%;background:var(--seq-450)` })),
+        el("span", { class: "num" }, score ? score.toFixed(2) : "—")),
+      sources.length ? el("div", { class: "evidence-sources" }, sources.join(" · ")) : null));
+  }
+  const empty = !Object.values(g.ot_datatypes).some(v => v > 0);
+  return el("div", { class: "card" },
+    el("h2", {}, "Evidence sources"),
+    el("p", { class: "sub" },
+      "Open Targets association evidence for ", g.symbol,
+      " in SLE, by evidence class. Sub-lines name the contributing databases."),
+    empty ? el("p", { class: "muted" },
+      "No Open Targets association evidence — this gene ranks on literature mentions alone.")
+      : el("div", {}, ...rows));
 }
 
 /* ---------- pathways ---------- */
