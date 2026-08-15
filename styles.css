@@ -20,6 +20,11 @@
   --heat-1: #b7d3f6;   /* sequential blue: low / mid / high */
   --heat-2: #5598e7;
   --heat-3: #184f95;
+  --organ-brain: #e87ba4;
+  --organ-lung: #2a78d6;
+  --organ-heart: #e34948;
+  --organ-kidney: #eb6834;
+  --organ-joint: #4a3aa7;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -43,6 +48,11 @@
     --heat-1: #184f95;   /* dark mode: low recedes toward surface, high brightens */
     --heat-2: #256abf;
     --heat-3: #6da7ec;
+    --organ-brain: #d55181;
+    --organ-lung: #3987e5;
+    --organ-heart: #e66767;
+    --organ-kidney: #d95926;
+    --organ-joint: #9085e9;
   }
 }
 
