@@ -1,6 +1,12 @@
-# Lupus Gene Tracker
+<p align="center">
+  <img src="logo.svg" alt="" width="88" height="88">
+</p>
 
-**Live site: <https://eastmanmd.github.io/LupusExplorer/>**
+<h1 align="center">Lupus Gene Explorer</h1>
+
+<p align="center">
+  <strong><a href="https://eastmanmd.github.io/LupusExplorer/">View the live site →</a></strong>
+</p>
 
 A dashboard that tracks which genes the systemic lupus erythematosus (SLE)
 research literature is actually talking about. It ranks genes by a combined
