@@ -54,6 +54,7 @@ a:hover { text-decoration: underline; }
 .site-header { padding: 28px 0 8px; }
 .site-header h1 { margin: 0; font-size: 26px; }
 .tagline { margin: 4px 0 0; color: var(--ink-2); }
+.intro { margin: 10px 0 0; color: var(--ink-2); font-size: 13.5px; max-width: 860px; }
 .provenance { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 
 /* ---- KPI row ---- */
