@@ -2,8 +2,11 @@
 "use strict";
 
 const state = {
-  genes: [],
+  genes: [],            // top N, full detail payload
   geneBySymbol: new Map(),
+  pool: [],             // every ranked gene, slim: score components only
+  ranked: [],           // pool re-scored under the live weights, best first
+  weights: null,        // {mentions, recency, opentargets}, always summing to 1
   articles: new Map(),
   pathways: [],
   pathwayById: new Map(),
@@ -11,6 +14,18 @@ const state = {
   compare: [],          // symbols, max 3
   pathwaySource: "all",
   compareAsTable: false,
+};
+
+const WEIGHT_KEYS = ["mentions", "recency", "opentargets"];
+const WEIGHT_LABELS = {
+  mentions: "Mentions",
+  recency: "Recency",
+  opentargets: "Open Targets",
+};
+const WEIGHT_HELP = {
+  mentions: "Total lupus papers mentioning the gene (log-scaled) — favors established targets",
+  recency: "Papers in the last 5 years (log-scaled) — surfaces newly emergent candidates",
+  opentargets: "Curated Open Targets association score for SLE — independent evidence",
 };
 
 const SOURCE_LABELS = { "GO:BP": "GO Biological Process", KEGG: "KEGG", REAC: "Reactome" };
@@ -263,15 +278,67 @@ function trendLineChart(seriesList) {
   return el("div", { class: "chart-box" }, svg);
 }
 
+/* ---------- scoring under live weights ---------- */
+function normalizeWeights(raw) {
+  const total = WEIGHT_KEYS.reduce((s, k) => s + Math.max(0, raw[k] || 0), 0);
+  if (!total) return { ...state.meta.weights };   // all-zero is meaningless; fall back
+  const out = {};
+  for (const k of WEIGHT_KEYS) out[k] = Math.max(0, raw[k] || 0) / total;
+  return out;
+}
+
+/* Rescore the whole pool, sort, and record each gene's movement against the
+   default-weight ranking that shipped in the data. */
+function rescore() {
+  const w = state.weights;
+  for (const g of state.pool) {
+    g.score = Math.round(1000 * (w.mentions * g.m + w.recency * g.r
+                                 + w.opentargets * g.o)) / 10;
+  }
+  state.ranked = [...state.pool].sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol));
+  state.ranked.forEach((g, i) => {
+    g.liveRank = i + 1;
+    // g.rank is the default-weight rank, null for genes below the shipped top N
+    g.delta = g.rank ? g.rank - g.liveRank : null;
+    g.detail = state.geneBySymbol.get(g.symbol) || null;
+  });
+}
+
+function weightsAreDefault() {
+  return WEIGHT_KEYS.every(k => Math.abs(state.weights[k] - state.meta.weights[k]) < 0.005);
+}
+
+function readWeightsFromHash() {
+  const raw = new URLSearchParams(location.hash.slice(1)).get("w");
+  if (!raw) return null;
+  const parts = raw.split(",").map(Number);
+  if (parts.length !== 3 || parts.some(n => !isFinite(n) || n < 0)) return null;
+  return normalizeWeights({ mentions: parts[0], recency: parts[1], opentargets: parts[2] });
+}
+
+/* Single writer for the URL hash, so a custom weighting survives navigation
+   and a shared link restores both the gene and the weighting. */
+function setHash({ gene } = {}) {
+  const params = new URLSearchParams();
+  if (gene) params.set("gene", gene);
+  if (!weightsAreDefault()) {
+    params.set("w", WEIGHT_KEYS.map(k => state.weights[k].toFixed(2)).join(","));
+  }
+  const hash = params.toString();
+  history.replaceState(null, "", hash ? `#${hash}` : location.pathname + location.search);
+}
+
 /* ---------- KPI row ---------- */
 function renderKPIs() {
   const m = state.meta;
-  const topGene = state.genes[0];
+  const topGene = state.ranked[0];
   const rising = state.genes.filter(g => g.rising).length;
   document.getElementById("kpi-row").replaceChildren(
     statTile("Lupus articles in corpus", fmt(m.corpus_articles), `PubMed query, through ${m.max_year}`),
-    statTile("Genes ranked", fmt(m.genes_ranked), `top ${fmt(m.genes_shown)} shown`),
-    statTile("Top gene", topGene.symbol, `score ${topGene.score} · ${fmt(topGene.papers)} papers`),
+    statTile("Genes ranked", fmt(m.genes_ranked), `top ${fmt(m.genes_shown)} with full detail`),
+    statTile("Top gene", topGene.symbol,
+      `score ${topGene.score.toFixed(1)} · ${fmt(topGene.papers)} papers` +
+      (weightsAreDefault() ? "" : " · custom weights")),
     statTile("Rising genes", fmt(rising), `recent-5-yr share ≥ 1.5× corpus`),
   );
 }
@@ -285,6 +352,63 @@ function statTile(label, value, sub) {
 /* ---------- gene leaderboard ---------- */
 const genesFilter = { q: "", risingOnly: false, geneticOnly: false, drugOnly: false, rnaOnly: false };
 
+/* Weight sliders. Raw slider positions are independent 0–100; the weights they
+   produce are normalized to sum to 1 so scores stay on the documented 0–100
+   scale no matter how the sliders are dragged. */
+const sliderRaw = {};
+let rescoreQueued = false;
+
+function weightPanel() {
+  for (const k of WEIGHT_KEYS) sliderRaw[k] = Math.round(state.weights[k] * 100);
+  const rows = WEIGHT_KEYS.map(k => {
+    const input = el("input", { type: "range", min: "0", max: "100", step: "1",
+      value: String(sliderRaw[k]), "aria-label": `${WEIGHT_LABELS[k]} weight`,
+      oninput: e => { sliderRaw[k] = Number(e.target.value); queueRescore(); } });
+    return el("div", { class: "weight-row", title: WEIGHT_HELP[k] },
+      el("label", { class: "weight-label" }, WEIGHT_LABELS[k]),
+      input,
+      el("span", { class: "weight-val", id: `wval-${k}` },
+        `${Math.round(state.weights[k] * 100)}%`));
+  });
+  return el("div", { class: "card weight-card" },
+    el("div", { class: "weight-head" },
+      el("div", {},
+        el("h2", {}, "Score weighting"),
+        el("p", { class: "sub" },
+          "Drag to re-rank all " + fmt(state.meta.genes_ranked) + " genes in real time. " +
+          "Weights are normalized to sum to 100%, so scores stay comparable.")),
+      el("div", { class: "weight-actions" },
+        el("button", { class: "back-btn weight-reset", onclick: () => {
+          state.weights = { ...state.meta.weights };
+          rescore();
+          renderKPIs();
+          renderGenesView();
+          setHash();
+        } }, "Reset to default"),
+        el("span", { class: "muted weight-status", id: "weight-status" },
+          weightsAreDefault() ? "default weighting" : "custom weighting"))),
+    el("div", { class: "weight-grid" }, ...rows));
+}
+
+function queueRescore() {
+  if (rescoreQueued) return;
+  rescoreQueued = true;
+  requestAnimationFrame(() => {
+    rescoreQueued = false;
+    state.weights = normalizeWeights(sliderRaw);
+    rescore();
+    for (const k of WEIGHT_KEYS) {
+      const cell = document.getElementById(`wval-${k}`);
+      if (cell) cell.textContent = `${Math.round(state.weights[k] * 100)}%`;
+    }
+    const status = document.getElementById("weight-status");
+    if (status) status.textContent = weightsAreDefault() ? "default weighting" : "custom weighting";
+    renderKPIs();
+    renderGeneTable();
+    setHash();
+  });
+}
+
 function renderGenesView() {
   const view = document.getElementById("view-genes");
   const search = el("input", { type: "search", placeholder: "Search gene symbol or name…",
@@ -296,6 +420,7 @@ function renderGenesView() {
     return el("label", { class: "check" }, box, label);
   };
   view.replaceChildren(
+    weightPanel(),
     el("div", { class: "filter-row" },
       search,
       check("risingOnly", "Rising"),
@@ -323,21 +448,52 @@ function renderGenesView() {
 
 function renderGeneTable() {
   const q = genesFilter.q.trim().toLowerCase();
-  const rows = state.genes.filter(g =>
-    (!q || g.symbol.toLowerCase().includes(q) || g.name.toLowerCase().includes(q)) &&
-    (!genesFilter.risingOnly || g.rising) &&
-    (!genesFilter.geneticOnly || g.ot_genetic >= 0.2) &&
-    (!genesFilter.drugOnly || (g.ot_datatypes.clinical || 0) > 0) &&
-    (!genesFilter.rnaOnly || (g.ot_datatypes.rna_expression || 0) > 0));
-  document.getElementById("gene-count").textContent = `${rows.length} genes`;
-  const maxScore = state.genes[0].score;
-  document.getElementById("gene-tbody").replaceChildren(...rows.map(g =>
+  const anyEvidenceFilter = genesFilter.risingOnly || genesFilter.geneticOnly
+    || genesFilter.drugOnly || genesFilter.rnaOnly;
+  const rows = state.ranked.filter(g => {
+    if (q && !g.symbol.toLowerCase().includes(q) && !g.name.toLowerCase().includes(q)) return false;
+    // Evidence flags only exist for genes with a full detail payload.
+    if (!anyEvidenceFilter) return true;
+    const d = g.detail;
+    if (!d) return false;
+    return (!genesFilter.risingOnly || d.rising)
+      && (!genesFilter.geneticOnly || d.ot_genetic >= 0.2)
+      && (!genesFilter.drugOnly || (d.ot_datatypes.clinical || 0) > 0)
+      && (!genesFilter.rnaOnly || (d.ot_datatypes.rna_expression || 0) > 0);
+  }).slice(0, 300);
+
+  const total = state.ranked.filter(g => {
+    if (q && !g.symbol.toLowerCase().includes(q) && !g.name.toLowerCase().includes(q)) return false;
+    if (!anyEvidenceFilter) return true;
+    const d = g.detail;
+    return d && (!genesFilter.risingOnly || d.rising)
+      && (!genesFilter.geneticOnly || d.ot_genetic >= 0.2)
+      && (!genesFilter.drugOnly || (d.ot_datatypes.clinical || 0) > 0)
+      && (!genesFilter.rnaOnly || (d.ot_datatypes.rna_expression || 0) > 0);
+  }).length;
+  document.getElementById("gene-count").textContent =
+    total > rows.length ? `showing top ${rows.length} of ${fmt(total)} genes` : `${fmt(total)} genes`;
+
+  const tbody = document.getElementById("gene-tbody");
+  if (!rows.length) {
+    tbody.replaceChildren(el("tr", {}, el("td", { colspan: "7", class: "empty-state" },
+      el("p", {}, "No genes match these filters."),
+      el("button", { class: "back-btn", onclick: () => {
+        genesFilter.q = "";
+        for (const k of ["risingOnly", "geneticOnly", "drugOnly", "rnaOnly"]) genesFilter[k] = false;
+        renderGenesView();
+      } }, "Clear filters"))));
+    return;
+  }
+
+  const maxScore = state.ranked[0].score || 1;
+  tbody.replaceChildren(...rows.map(g =>
     el("tr", { class: "gene-row", tabindex: "0", role: "button",
       onclick: () => showDetail(g.symbol),
       onkeydown: ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); showDetail(g.symbol); } } },
-      el("td", { class: "num muted" }, String(g.rank)),
+      el("td", { class: "num muted" }, String(g.liveRank)),
       el("td", {},
-        el("div", { class: "gene-symbol" }, g.symbol),
+        el("div", { class: "gene-symbol" }, g.symbol, rankDelta(g)),
         el("div", { class: "gene-name" }, g.name)),
       el("td", {}, el("div", { class: "score-cell" },
         el("div", { class: "bar-track" },
@@ -345,23 +501,39 @@ function renderGeneTable() {
         el("span", { class: "val" }, g.score.toFixed(1)))),
       el("td", { class: "num" }, fmt(g.papers)),
       el("td", { class: "num" }, fmt(g.recent_papers)),
-      el("td", {}, sparkline(g)),
+      el("td", {}, g.detail ? sparkline(g.detail) : el("span", { class: "muted" }, "—")),
       el("td", {},
-        evidenceStrip(g),
-        g.rising ? el("span", { class: "badge rising" }, "rising ↑") : null)),
+        g.detail ? evidenceStrip(g.detail) : null,
+        g.detail && g.detail.rising ? el("span", { class: "badge rising" }, "rising ↑") : null)),
   ));
+}
+
+/* Movement against the default weighting — the point of the sliders. */
+function rankDelta(g) {
+  if (weightsAreDefault()) return null;
+  if (g.rank === null || g.rank === undefined) {
+    return el("span", { class: "delta delta-new",
+      title: "Outside the default top " + fmt(state.meta.genes_shown) }, "new");
+  }
+  if (!g.delta) return null;
+  const up = g.delta > 0;
+  return el("span", { class: `delta ${up ? "delta-up" : "delta-down"}`,
+    title: `Default-weight rank #${g.rank}` },
+    `${up ? "▲" : "▼"} ${Math.abs(g.delta)}`);
 }
 
 /* ---------- gene detail ---------- */
 function showDetail(symbol) {
   const g = state.geneBySymbol.get(symbol);
-  if (!g) return;
-  history.replaceState(null, "", `#gene=${encodeURIComponent(symbol)}`);
+  if (!g) return showPoolDetail(symbol);
+  const live = state.ranked.find(p => p.symbol === symbol);
+  setHash({ gene: symbol });
   const view = document.getElementById("view-detail");
-  const w = state.meta.weights;
+  const w = state.weights;
+  const fw = k => w[k].toFixed(2).replace(/0$/, "");
   const components = [
-    { label: `Mentions (×${w.mentions})`, value: g.mention_norm, color: "var(--seq-450)" },
-    { label: `Recency (×${w.recency})`, value: g.recency_norm, color: "var(--seq-250)" },
+    { label: `Mentions (×${fw("mentions")})`, value: g.mention_norm, color: "var(--seq-450)" },
+    { label: `Recency (×${fw("recency")})`, value: g.recency_norm, color: "var(--seq-250)" },
     { label: `Open Targets (×${w.opentargets})`, value: g.ot_score, color: "var(--seq-150)" },
   ];
   const articles = g.article_pmids.map(p => state.articles.get(p)).filter(Boolean);
@@ -377,13 +549,16 @@ function showDetail(symbol) {
       el("span", { class: "muted" }, g.name),
       el("a", { href: `https://www.ncbi.nlm.nih.gov/gene/${g.entrez}`, target: "_blank", rel: "noopener" }, "NCBI Gene ↗")),
     el("div", { class: "kpi-row" },
-      statTile("Combined score", g.score.toFixed(1), `rank #${g.rank} of ${fmt(state.meta.genes_shown)}`),
+      statTile("Combined score", (live ? live.score : g.score).toFixed(1),
+        live ? `rank #${live.liveRank} of ${fmt(state.meta.genes_ranked)}` +
+          (weightsAreDefault() ? "" : " · custom weights") : `rank #${g.rank}`),
       statTile("Lupus papers", fmt(g.papers), "all years"),
       statTile("Last 5 years", fmt(g.recent_papers), g.rising ? "rising ↑" : "papers since " + state.meta.recent_cutoff),
       statTile("Open Targets", g.ot_score.toFixed(2), `genetic ${g.ot_genetic.toFixed(2)}`)),
     el("div", { class: "card" },
       el("h2", {}, "Score breakdown"),
-      el("p", { class: "sub" }, "Each component is normalized 0–1; the combined score is the weighted sum × 100."),
+      el("p", { class: "sub" }, "Each component is normalized 0–1; the combined score is the weighted sum × 100." +
+        (weightsAreDefault() ? "" : " Weights below reflect your custom slider settings.")),
       ...components.map(c => el("div", { class: "breakdown-row" },
         el("span", {}, c.label),
         el("div", { class: "track" }, el("div", { class: "fill", style: `width:${c.value * 100}%;background:${c.color}` })),
@@ -408,6 +583,51 @@ function showDetail(symbol) {
           el("td", {}, el("a", { href: `https://pubmed.ncbi.nlm.nih.gov/${a.pmid}/`, target: "_blank", rel: "noopener" },
             a.title || `PMID ${a.pmid}`)),
           el("td", { class: "muted" }, a.journal)))))),
+  );
+  switchView("detail", { keepHash: true });
+  window.scrollTo({ top: 0 });
+}
+
+/* Genes ranked but outside the shipped top N carry score components only —
+   enough for an honest compact page, without article or pathway payloads. */
+function showPoolDetail(symbol) {
+  const g = state.ranked.find(p => p.symbol === symbol);
+  if (!g) return;
+  setHash({ gene: symbol });
+  const w = state.weights;
+  const fw = k => w[k].toFixed(2).replace(/0$/, "");
+  const components = [
+    { label: `Mentions (×${fw("mentions")})`, value: g.m, color: "var(--seq-450)" },
+    { label: `Recency (×${fw("recency")})`, value: g.r, color: "var(--seq-250)" },
+    { label: `Open Targets (×${fw("opentargets")})`, value: g.o, color: "var(--seq-150)" },
+  ];
+  document.getElementById("view-detail").replaceChildren(
+    el("button", { class: "back-btn", onclick: () => switchView("genes") }, "← Back to leaderboard"),
+    el("div", { class: "detail-head" },
+      el("h2", {}, g.symbol),
+      el("span", { class: "muted" }, g.name),
+      el("a", { href: `https://www.ncbi.nlm.nih.gov/gene/${g.entrez}`, target: "_blank", rel: "noopener" }, "NCBI Gene ↗")),
+    el("div", { class: "kpi-row" },
+      statTile("Combined score", g.score.toFixed(1), `rank #${g.liveRank} of ${fmt(state.meta.genes_ranked)}`),
+      statTile("Lupus papers", fmt(g.papers), "all years"),
+      statTile("Last 5 years", fmt(g.recent_papers), "papers since " + state.meta.recent_cutoff),
+      statTile("Open Targets", g.o.toFixed(2), "association score")),
+    el("div", { class: "card" },
+      el("h2", {}, "Score breakdown"),
+      el("p", { class: "sub" }, "Each component is normalized 0–1; the combined score is the weighted sum × 100."),
+      ...components.map(c => el("div", { class: "breakdown-row" },
+        el("span", {}, c.label),
+        el("div", { class: "track" }, el("div", { class: "fill", style: `width:${c.value * 100}%;background:${c.color}` })),
+        el("span", { class: "num" }, c.value.toFixed(2))))),
+    el("div", { class: "card" },
+      el("h2", {}, "Limited detail for this gene"),
+      el("p", { class: "sub" },
+        `${g.symbol} ranks outside the top ${fmt(state.meta.genes_shown)} under the default ` +
+        "weighting, so per-year trends, pathway membership, and article lists were not " +
+        "included in the published dataset. Its score components above are complete."),
+      el("p", { class: "sub" },
+        el("a", { href: `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(`(${g.symbol}) AND (lupus)`)}`,
+          target: "_blank", rel: "noopener" }, `Search PubMed for ${g.symbol} and lupus ↗`))),
   );
   switchView("detail", { keepHash: true });
   window.scrollTo({ top: 0 });
@@ -789,7 +1009,7 @@ function switchView(name, { keepHash } = {}) {
   for (const v of ["genes", "pathways", "compare", "about", "detail"]) {
     document.getElementById(`view-${v}`).hidden = v !== name;
   }
-  if (!keepHash) history.replaceState(null, "", location.pathname + location.search);
+  if (!keepHash) setHash();   // drops #gene= but preserves any custom weighting
   if (name === "genes") renderGenesView();
   if (name === "pathways") renderPathwaysView();
   if (name === "compare") renderCompareView();
@@ -798,8 +1018,8 @@ function switchView(name, { keepHash } = {}) {
 
 /* ---------- boot ---------- */
 async function boot() {
-  const [genes, articles, pathways, meta] = await Promise.all(
-    ["genes", "articles", "pathways", "meta"].map(name =>
+  const [genes, articles, pathways, meta, pool] = await Promise.all(
+    ["genes", "articles", "pathways", "meta", "pool"].map(name =>
       fetch(`data/${name}.json`).then(r => {
         if (!r.ok) throw new Error(`${name}.json: HTTP ${r.status}`);
         return r.json();
@@ -807,9 +1027,13 @@ async function boot() {
   state.genes = genes.genes;
   state.meta = meta;
   state.pathways = pathways.pathways;
+  state.pool = pool.pool;
   for (const g of state.genes) state.geneBySymbol.set(g.symbol, g);
   for (const a of articles.articles) state.articles.set(a.pmid, a);
   for (const t of state.pathways) state.pathwayById.set(t.id, t);
+
+  state.weights = readWeightsFromHash() || { ...meta.weights };
+  rescore();
 
   document.getElementById("loading").remove();
   document.getElementById("provenance").textContent =
@@ -819,7 +1043,7 @@ async function boot() {
     tab.addEventListener("click", () => switchView(tab.dataset.view));
   }
   const hashGene = new URLSearchParams(location.hash.slice(1)).get("gene");
-  if (hashGene && state.geneBySymbol.has(hashGene)) showDetail(hashGene);
+  if (hashGene && state.ranked.some(g => g.symbol === hashGene)) showDetail(hashGene);
   else switchView("genes");
 }
 

@@ -171,6 +171,21 @@ def main():
     for rank, g in enumerate(top, 1):
         g["rank"] = rank
 
+    # Slim scoring pool: every ranked gene with just the three score components,
+    # so the dashboard's weight sliders can re-rank across the whole set rather
+    # than only the shipped top N. Genes outside the top N have no detail payload.
+    pool = [{
+        "symbol": g["symbol"],
+        "name": g["name"],
+        "entrez": g["entrez"],
+        "papers": g["papers"],
+        "recent_papers": g["recent_papers"],
+        "m": g["mention_norm"],
+        "r": g["recency_norm"],
+        "o": round(g["ot_score"], 4),
+        "rank": g.get("rank"),        # default-weight rank; null outside the top N
+    } for g in genes]
+
     # Pathways: fold in enrichment results if present
     pathways = []
     top_symbols = {g["symbol"] for g in top}
@@ -199,6 +214,8 @@ def main():
     os.makedirs(config.DATA_DIR, exist_ok=True)
     with open(os.path.join(config.DATA_DIR, "genes.json"), "w") as f:
         json.dump({"genes": top}, f)
+    with open(os.path.join(config.DATA_DIR, "pool.json"), "w") as f:
+        json.dump({"pool": pool}, f)
     with open(os.path.join(config.DATA_DIR, "articles.json"), "w") as f:
         json.dump({"articles": sorted(keep_articles.values(),
                                       key=lambda a: -(a["year"] or 0))}, f)

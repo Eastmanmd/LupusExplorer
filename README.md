@@ -30,6 +30,25 @@ Each gene gets a score from 0–100:
 Each component is normalized to 0–1 before weighting, and every gene's detail
 page shows its breakdown, so you can always see *why* a gene ranks where it does.
 
+### Adjust the weights yourself
+
+The weights above are only a starting point. **Sliders on the leaderboard
+re-rank all 1,505 genes in real time**, so you can ask different questions of
+the same data:
+
+- Push **Recency** up to surface newly emergent candidates rather than
+  long-established targets.
+- Push **Open Targets** up to rank by curated biological evidence rather than
+  publication volume — this pulls up the classic SLE genetics hits (TREX1,
+  DNASE1L3, BLK, TYK2, PTPN22) and brings in ~110 genes that never appear
+  under the default weighting.
+- Genes that move show a **▲/▼ rank delta** against the default ranking, and
+  ones entering from outside the default top 300 are marked **new**.
+
+Weights are normalized to sum to 100% so scores stay comparable, and the
+current weighting is written into the URL — so a particular weighting is a
+shareable, citable link (e.g. `…/#w=0.10,0.20,0.70`).
+
 ## How the genes were curated
 
 No hand-picked gene list — genes emerge from the literature itself:
