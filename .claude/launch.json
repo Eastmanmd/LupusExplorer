@@ -1,11 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    {
-      "name": "dashboard",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8000", "--directory", "."],
-      "port": 8000
-    }
+    { "name": "lupus", "runtimeExecutable": "python3", "runtimeArgs": ["-m", "http.server", "8123"], "port": 8123 }
   ]
 }
