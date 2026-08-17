@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 462 80" role="img" aria-label="Lupus Gene Explorer">
+  <style>
+    .ring { stroke: #4a3aa7; }
+    .bar-u { fill: #4a3aa7; }
+    .bar-l { fill: #e87ba4; }
+    .word { fill: #0b0b0b; }
+    @media (prefers-color-scheme: dark) {
+      .ring { stroke: #9085e9; }
+      .bar-u { fill: #9085e9; }
+      .bar-l { fill: #d55181; }
+      .word { fill: #ffffff; }
+    }
+  </style>
+  <!-- Mark: 72 units wide, centred on y = 40 so the wordmark can sit on that same line. -->
+  <g transform="translate(4 4) scale(1.125)">
+    <circle class="ring" cx="32" cy="32" r="29" fill="none" stroke-width="2.8"/>
+    <g class="bar-u">
+      <rect x="30.4" y="11" width="3.2" height="42" rx="1.6"/>
+      <rect x="18.1" y="13.25" width="10.5" height="5.5" rx="2.75"/>
+      <rect x="35.4" y="13.25" width="10.5" height="5.5" rx="2.75"/>
+      <rect x="10.1" y="21.25" width="18.5" height="5.5" rx="2.75"/>
+      <rect x="35.4" y="21.25" width="18.5" height="5.5" rx="2.75"/>
+      <rect x="7.6" y="29.25" width="21" height="5.5" rx="2.75"/>
+      <rect x="35.4" y="29.25" width="21" height="5.5" rx="2.75"/>
+    </g>
+    <g class="bar-l">
+      <rect x="15.1" y="37.25" width="13.5" height="5.5" rx="2.75"/>
+      <rect x="35.4" y="37.25" width="13.5" height="5.5" rx="2.75"/>
+      <rect x="20.6" y="45.25" width="8" height="5.5" rx="2.75"/>
+      <rect x="35.4" y="45.25" width="8" height="5.5" rx="2.75"/>
+    </g>
+  </g>
+  <!-- Baseline sits at 40 + half the cap height, so the caps straddle the circle's diameter.
+       textLength pins the width, keeping the layout identical whichever system font resolves. -->
+  <text class="word" x="92" y="52.3" textLength="352" lengthAdjust="spacingAndGlyphs"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="34" font-weight="700" letter-spacing="-0.4">Lupus Gene Explorer</text>
+</svg>

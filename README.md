@@ -1,6 +1,5 @@
 <h1>
-  <img src="logo.svg" alt="" width="72" height="72" align="middle">
-  Lupus Gene Explorer
+  <img src="logo-wordmark.svg" alt="Lupus Gene Explorer" width="440">
 </h1>
 
 <strong><a href="https://eastmanmd.github.io/LupusExplorer/">View the live site →</a></strong>
