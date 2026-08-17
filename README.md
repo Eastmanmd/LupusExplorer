@@ -1,5 +1,5 @@
 <h1>
-  <img src="logo.svg" alt="" width="44" height="44" align="middle">
+  <img src="logo.svg" alt="" width="72" height="72" align="middle">
   Lupus Gene Explorer
 </h1>
 
