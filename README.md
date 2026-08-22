@@ -60,6 +60,92 @@ No hand-picked gene list — genes emerge from the literature itself:
 4. **Ranking**: the ~1,500 surviving genes are scored, and the top 300 are
    shown in the dashboard.
 
+## Finding a drug target
+
+The leaderboard ranks **attention**. That is a useful thing to measure, but it
+is not the same as opportunity — the genes at the top are largely the ones that
+already have drugs. The **Target opportunities** tab scores a different
+question: *should someone start a drug programme here?*
+
+Every ranked gene gets a **Target Opportunity Score** built from 16 named
+criteria across four pillars:
+
+| Pillar | Weight | The question | Criteria |
+|---|---|---|---|
+| **Evidence** | 30% | Is the lupus link real, causal, and current? | Genetic association · Overall SLE association · Literature specificity · Research momentum |
+| **Tractability** | 30% | Could a molecule actually engage this protein? | Best modality · Chemical matter · Biologic accessibility · Family precedent |
+| **Safety** | 20% | Is inhibiting it likely to be tolerated? | LoF tolerance (gnomAD) · Mouse knockout burden (IMPC) · Non-essentiality (DepMap) · Expression focus · Clean safety record |
+| **Opportunity** | 20% | Is the space open, and is the pharmacology proven nearby? | Unclaimed space · Cross-indication precedent · Network proximity |
+
+Three things make this more than a re-weighting of the leaderboard:
+
+**Opportunity runs backwards.** A target with an approved lupus drug scores
+near zero on this pillar — it is answered, not available. IFNAR1 and TNFSF13B
+are triumphs of lupus drug discovery and *bad* answers to "what should we work
+on next".
+
+**Evidence is a gate, not just a weight.** A beautifully druggable protein with
+no credible link to lupus is not a lupus target, so the whole score is scaled
+down (never below 35%) when the evidence pillar is weak. Without this, chemistry
+wins: MPL and MIF are eminently druggable and rank in the top 15 on the additive
+score alone, on the strength of ~1% of their literature being about lupus.
+
+**Cross-indication precedent is a first-class signal.** A drug that already hits
+this target in one of 30 curated immune-mediated indications — rheumatoid
+arthritis, Sjögren's, systemic sclerosis, myositis, ANCA vasculitis, ITP,
+psoriasis, IBD and others — is proven human pharmacology one indication away.
+C1S surfaces this way: sutimlimab is approved in autoimmune hemolytic anemia,
+and nothing targets C1S in lupus.
+
+### Reading a gene's page
+
+Click any row for the full breakdown: every criterion with its score, its
+weight, the sentence explaining what the number means for *that* gene, and the
+database it came from — so "genetic evidence 0.82" expands to *ClinGen, ClinVar,
+Genomics England PanelApp, GWAS credible sets, UniProt literature*, and
+"literature specificity 0.96" expands to *74 of 266 PubMed papers mentioning
+DNASE1L3 (incl. DHP2, DNAS1L3, SLEB16) are lupus papers*.
+
+### Adjust the pillars yourself
+
+As on the leaderboard, four sliders re-rank all 300 genes live and the
+weighting is written into the URL. The rankings genuinely diverge:
+
+- **Default** — CCR1, TYK2, BLK, DNASE1L3, TLR7, C1S
+- **Opportunity-heavy** — C1S, CCR1, TYK2, CTLA4, TNFSF4, FCGR2A
+- **Safety-heavy** — CCL22, CCR1, BLK, DNASE1L3, CD226, IFNA2
+
+Filters are **No SLE programme** / **Repurposing candidates** / **Tractable** /
+**Hide safety flags**, and they combine. The most useful single view is the
+first two together — 52 genes with proven pharmacology elsewhere and an open
+lupus space, led by CCR1, C1S, CTLA4, TNFSF4, C3 and CCR2.
+
+### Literature specificity, and why the denominator is hard
+
+Raw mention counts reward genes famous everywhere: IL6 appears in tens of
+thousands of papers across all of biology, so a lupus mention says little about
+lupus. The fix is lupus papers ÷ total PubMed papers — but PubTator found the
+numerator by resolving synonyms, so a denominator built from the approved symbol
+alone is badly wrong. TNFSF13B had *more lupus papers than papers containing the
+string "TNFSF13B"*, because the field writes BAFF and BLyS. Entrez aliases go
+into the denominator query so both sides count the same way, common English
+words are filtered out of the alias list, and genes with fewer than 150 total
+papers score neutral rather than spuriously specific.
+
+### Caveats
+
+- Tractability, constraint, essentiality and interaction data come from Open
+  Targets' target-prioritisation framework; where a gene is missing a signal it
+  scores neutral rather than zero, which flatters sparsely annotated genes.
+- The cross-indication list is curated by hand (MONDO's "autoimmune disease"
+  branch excludes psoriasis, IBD, systemic sclerosis and myositis, so walking
+  the ontology was not an option). It is in `pipeline/config.py` and is meant to
+  be edited.
+- Network proximity uses IntAct physical interactions only — no directionality,
+  so "upstream of a validated target" and "downstream of one" score the same.
+- This ranks hypotheses worth a closer look. It is not a substitute for reading
+  the biology.
+
 ## Pathway analysis
 
 The top-ranked genes are tested for functional enrichment with

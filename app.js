@@ -14,6 +14,10 @@ const state = {
   compare: [],          // symbols, max 3
   pathwaySource: "all",
   compareAsTable: false,
+  targets: [],          // drug-target opportunity scores, one per ranked gene
+  targetMeta: null,     // pillar + criterion definitions shipped with the data
+  targetWeights: null,  // {evidence, tractability, safety, opportunity}
+  targetRanked: [],     // targets re-scored under the live pillar weights
 };
 
 const WEIGHT_KEYS = ["mentions", "recency", "opentargets"];
@@ -369,13 +373,27 @@ function readWeightsFromHash() {
   return normalizeWeights({ mentions: parts[0], recency: parts[1], opentargets: parts[2] });
 }
 
+function readTargetWeightsFromHash() {
+  const raw = new URLSearchParams(location.hash.slice(1)).get("tw");
+  if (!raw || !state.targetMeta) return null;
+  const parts = raw.split(",").map(Number);
+  if (parts.length !== 4 || parts.some(n => !isFinite(n) || n < 0)) return null;
+  const seed = {};
+  TARGET_PILLARS.forEach((k, i) => { seed[k] = parts[i]; });
+  return normalizeTargetWeights(seed);
+}
+
 /* Single writer for the URL hash, so a custom weighting survives navigation
    and a shared link restores both the gene and the weighting. */
-function setHash({ gene } = {}) {
+function setHash({ gene, target } = {}) {
   const params = new URLSearchParams();
   if (gene) params.set("gene", gene);
+  if (target) params.set("target", target);
   if (!weightsAreDefault()) {
     params.set("w", WEIGHT_KEYS.map(k => state.weights[k].toFixed(2)).join(","));
+  }
+  if (!targetWeightsAreDefault()) {
+    params.set("tw", TARGET_PILLARS.map(k => state.targetWeights[k].toFixed(2)).join(","));
   }
   const hash = params.toString();
   history.replaceState(null, "", hash ? `#${hash}` : location.pathname + location.search);
@@ -1079,6 +1097,434 @@ function renderAboutView() {
   );
 }
 
+/* ---------- target opportunity ---------- */
+/* A deliberately different question from the leaderboard. The leaderboard ranks
+   attention; this ranks whether someone should start a drug programme. Genes
+   with an approved SLE drug score near zero on Opportunity by design — that
+   target is answered, not available. */
+
+const PILLAR_COLORS = {
+  evidence: "var(--series-1)",
+  tractability: "var(--series-3)",
+  safety: "var(--series-2)",
+  opportunity: "var(--organ-joint)",
+};
+const FLAG_LABELS = {
+  repurposing: ["repurposing", "A drug already hits this target in another immune-mediated disease, and the SLE space is still open"],
+  whitespace: ["whitespace", "Credible lupus evidence and a tractable protein, with no SLE drug or trial candidate against it"],
+  safety: ["safety flag", "Weak safety profile — LoF-intolerant, essential, or carrying curated liabilities"],
+  approved: ["approved in SLE", "A drug against this target is already approved for lupus"],
+};
+const TARGET_PILLARS = ["evidence", "tractability", "safety", "opportunity"];
+
+const targetsFilter = { q: "", openOnly: false, repurposeOnly: false,
+                        tractableOnly: false, hideSafety: false };
+const targetSliderRaw = {};
+let targetRescoreQueued = false;
+
+function normalizeTargetWeights(raw) {
+  const total = TARGET_PILLARS.reduce((s, k) => s + Math.max(0, raw[k] || 0), 0);
+  if (!total) return { ...state.targetMeta.pillar_weights };
+  const out = {};
+  for (const k of TARGET_PILLARS) out[k] = Math.max(0, raw[k] || 0) / total;
+  return out;
+}
+
+function targetWeightsAreDefault() {
+  if (!state.targetMeta || !state.targetWeights) return true;
+  return TARGET_PILLARS.every(k =>
+    Math.abs(state.targetWeights[k] - state.targetMeta.pillar_weights[k]) < 0.005);
+}
+
+/* Recompute pillar scores from the shipped per-criterion scores, then combine
+   under the live pillar weights. The evidence gate is multiplicative and is
+   applied after the weighted sum: tractability cannot substitute for a missing
+   disease link, whatever the sliders say. */
+function rescoreTargets() {
+  const meta = state.targetMeta;
+  const w = state.targetWeights;
+  const gate = meta.evidence_gate;
+  for (const t of state.targets) {
+    const pillars = {};
+    for (const pillar of TARGET_PILLARS) {
+      let sum = 0, totalW = 0;
+      for (const c of meta.criteria) {
+        if (c.pillar !== pillar) continue;
+        sum += (t.s[c.id] || 0) * c.weight;
+        totalW += c.weight;
+      }
+      pillars[pillar] = totalW ? sum / totalW : 0;
+    }
+    t.p = pillars;
+    t.gate = Math.max(gate.floor,
+      Math.min(1, gate.floor + (1 - gate.floor) * pillars.evidence / gate.full));
+    t.tos = Math.round(1000 * t.gate
+      * TARGET_PILLARS.reduce((s, k) => s + w[k] * pillars[k], 0)) / 10;
+  }
+  state.targetRanked = [...state.targets]
+    .sort((a, b) => b.tos - a.tos || a.symbol.localeCompare(b.symbol));
+  state.targetRanked.forEach((t, i) => {
+    t.liveRank = i + 1;
+    t.delta = t.rank ? t.rank - t.liveRank : null;
+  });
+}
+
+function queueTargetRescore() {
+  if (targetRescoreQueued) return;
+  targetRescoreQueued = true;
+  requestAnimationFrame(() => {
+    targetRescoreQueued = false;
+    state.targetWeights = normalizeTargetWeights(targetSliderRaw);
+    rescoreTargets();
+    for (const k of TARGET_PILLARS) {
+      const cell = document.getElementById(`twval-${k}`);
+      if (cell) cell.textContent = `${Math.round(state.targetWeights[k] * 100)}%`;
+    }
+    const status = document.getElementById("target-weight-status");
+    if (status) status.textContent = targetWeightsAreDefault() ? "default weighting" : "custom weighting";
+    renderTargetTable();
+    setHash();
+  });
+}
+
+function targetWeightPanel() {
+  const meta = state.targetMeta;
+  for (const k of TARGET_PILLARS) targetSliderRaw[k] = Math.round(state.targetWeights[k] * 100);
+  const rows = meta.pillars.map(pillar => {
+    const input = el("input", { type: "range", min: "0", max: "100", step: "1",
+      value: String(targetSliderRaw[pillar.id]),
+      "aria-label": `${pillar.label} weight`,
+      oninput: e => { targetSliderRaw[pillar.id] = Number(e.target.value); queueTargetRescore(); } });
+    return el("div", { class: "weight-row" },
+      el("div", { class: "weight-head" },
+        el("span", { class: "weight-label" }, pillar.label),
+        el("span", { class: "weight-val", id: `twval-${pillar.id}` },
+          `${Math.round(state.targetWeights[pillar.id] * 100)}%`)),
+      input,
+      el("p", { class: "weight-help" }, pillar.help));
+  });
+  return el("div", { class: "card weight-card" },
+    el("div", { class: "weight-card-head" },
+      el("div", {},
+        el("h2", {}, "What kind of target are you looking for?"),
+        el("p", { class: "sub" },
+          "Four pillars, re-weighted live across all " + fmt(state.targets.length) +
+          " ranked genes. Push Opportunity up to hunt unclaimed space, Tractability " +
+          "up to stay near proteins that can actually be drugged, Safety up to avoid " +
+          "the ones you would regret.")),
+      el("div", { class: "weight-actions" },
+        el("button", { class: "back-btn", onclick: () => {
+          state.targetWeights = { ...state.targetMeta.pillar_weights };
+          rescoreTargets();
+          renderTargetsView();
+          setHash();
+        } }, "Reset to default"),
+        el("span", { class: "muted weight-status", id: "target-weight-status" },
+          targetWeightsAreDefault() ? "default weighting" : "custom weighting"))),
+    el("div", { class: "weight-grid" }, ...rows));
+}
+
+/* Four-cell strip, one per pillar, shaded by score — the compact form of the
+   full breakdown on the detail page. */
+function pillarStrip(t) {
+  const meta = state.targetMeta;
+  const strip = el("div", { class: "pillar-strip", role: "img",
+    "aria-label": TARGET_PILLARS.map(k => `${k} ${t.p[k].toFixed(2)}`).join(", ") });
+  for (const pillar of meta.pillars) {
+    const score = t.p[pillar.id];
+    const cell = el("span", { class: "pillar-cell" },
+      el("span", { class: "pillar-fill",
+        style: `height:${Math.max(6, score * 100)}%;background:${PILLAR_COLORS[pillar.id]}` }));
+    cell.addEventListener("pointermove", ev =>
+      showTooltip(ev.clientX, ev.clientY, pillar.label,
+        [{ value: score.toFixed(2), label: pillar.help, color: PILLAR_COLORS[pillar.id] }]));
+    cell.addEventListener("pointerleave", hideTooltip);
+    strip.append(cell);
+  }
+  return strip;
+}
+
+function flagBadges(t) {
+  return t.flags.map(f => {
+    const [label, help] = FLAG_LABELS[f] || [f, ""];
+    const badge = el("span", { class: `badge flag flag-${f}` }, label);
+    if (help) {
+      badge.addEventListener("pointermove", ev =>
+        showTooltip(ev.clientX, ev.clientY, label, [{ value: "", label: help }]));
+      badge.addEventListener("pointerleave", hideTooltip);
+    }
+    return badge;
+  });
+}
+
+function renderTargetsView() {
+  const view = document.getElementById("view-targets");
+  const search = el("input", { type: "search", placeholder: "Search gene symbol or name…",
+    value: targetsFilter.q,
+    oninput: e => { targetsFilter.q = e.target.value; renderTargetTable(); } });
+  const check = (key, label, title) => {
+    const box = el("input", { type: "checkbox",
+      onchange: e => { targetsFilter[key] = e.target.checked; renderTargetTable(); } });
+    box.checked = targetsFilter[key];
+    return el("label", { class: "check", title }, box, label);
+  };
+  view.replaceChildren(
+    el("div", { class: "card intro-card" },
+      el("h2", {}, "Target Opportunity Score"),
+      el("p", {},
+        "The leaderboard ranks how much the field is talking about a gene. That is a " +
+        "popularity measure, and the genes at the top are largely the ones already " +
+        "drugged. This tab scores a different question: ",
+        el("strong", {}, "should someone start a drug programme here?")),
+      el("p", { class: "sub" },
+        "Every gene is scored on four pillars — Evidence, Tractability, Safety and " +
+        "Opportunity — built from " + state.targetMeta.criteria.length +
+        " named criteria drawn from Open Targets, gnomAD, DepMap, IMPC, IntAct, ChEMBL " +
+        "and PubMed. Opportunity runs backwards to the leaderboard on purpose: a target " +
+        "with an approved lupus drug scores near zero, because it is no longer an " +
+        "opportunity. Click any gene for the full criterion-by-criterion breakdown."),
+      el("p", { class: "sub" },
+        "Evidence also acts as a gate, not just a weight — a beautifully druggable " +
+        "protein with no credible link to lupus is not a lupus target, so the whole " +
+        "score is scaled down when the evidence pillar is weak.")),
+    targetWeightPanel(),
+    el("div", { class: "filter-row" },
+      search,
+      check("openOnly", "No SLE programme", "Genes with no drug or trial candidate against them in lupus"),
+      check("repurposeOnly", "Repurposing candidates", "A drug already hits this target in another immune-mediated disease"),
+      check("tractableOnly", "Tractable", "Tractability pillar at 0.50 or above"),
+      check("hideSafety", "Hide safety flags", "Drop genes whose safety pillar is below 0.35"),
+      el("span", { class: "count", id: "target-count" })),
+    el("div", { class: "card" },
+      el("p", { class: "sub", style: "margin-bottom:8px" },
+        "Pillar strip (left → right): " +
+        state.targetMeta.pillars.map(p => p.label).join(" · ") +
+        " — taller = stronger; hover a cell for the score."),
+      el("table", { class: "data" },
+        el("thead", {}, el("tr", {},
+          el("th", { class: "num" }, "#"),
+          el("th", {}, "Gene"),
+          el("th", {}, "Opportunity score"),
+          el("th", {}, "Pillars"),
+          el("th", {}, "SLE stage"),
+          el("th", {}, "Elsewhere"),
+          el("th", { class: "num" }, "Lit #"))),
+        el("tbody", { id: "target-tbody" }))),
+  );
+  renderTargetTable();
+}
+
+function renderTargetTable() {
+  const q = targetsFilter.q.trim().toLowerCase();
+  const matches = t => {
+    if (q && !t.symbol.toLowerCase().includes(q) && !t.name.toLowerCase().includes(q)) return false;
+    if (targetsFilter.openOnly && t.sle_stage) return false;
+    if (targetsFilter.repurposeOnly && !(t.cross_drugs || []).length) return false;
+    if (targetsFilter.tractableOnly && t.p.tractability < 0.5) return false;
+    if (targetsFilter.hideSafety && t.p.safety < 0.35) return false;
+    return true;
+  };
+  const rows = state.targetRanked.filter(matches);
+  document.getElementById("target-count").textContent =
+    `${fmt(rows.length)} of ${fmt(state.targets.length)} genes`;
+
+  const tbody = document.getElementById("target-tbody");
+  if (!rows.length) {
+    tbody.replaceChildren(el("tr", {}, el("td", { colspan: "7", class: "empty-state" },
+      el("p", {}, "No genes match these filters."),
+      el("button", { class: "back-btn", onclick: () => {
+        targetsFilter.q = "";
+        for (const k of ["openOnly", "repurposeOnly", "tractableOnly", "hideSafety"]) targetsFilter[k] = false;
+        renderTargetsView();
+      } }, "Clear filters"))));
+    return;
+  }
+
+  const maxScore = state.targetRanked[0].tos || 1;
+  tbody.replaceChildren(...rows.map(t => {
+    const best = (t.cross_drugs || [])[0];
+    return el("tr", { class: "gene-row", tabindex: "0", role: "button",
+      onclick: () => showTargetDetail(t.symbol),
+      onkeydown: ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); showTargetDetail(t.symbol); } } },
+      el("td", { class: "num muted" }, String(t.liveRank)),
+      el("td", {},
+        el("div", { class: "gene-symbol" }, t.symbol, targetRankDelta(t)),
+        el("div", { class: "gene-name" }, t.name),
+        t.flags.length ? el("div", { class: "flag-row" }, ...flagBadges(t)) : null),
+      el("td", {}, el("div", { class: "score-cell" },
+        el("div", { class: "bar-track" },
+          el("div", { class: "bar-fill", style: `width:${(t.tos / maxScore) * 100}%` })),
+        el("span", { class: "val" }, t.tos.toFixed(1)))),
+      el("td", {}, pillarStrip(t)),
+      el("td", {}, t.sle_stage
+        ? drugBadge({ drug_stage: t.sle_stage, drugs: t.sle_drugs })
+        : el("span", { class: "muted" }, "open")),
+      el("td", {}, best
+        ? el("span", { class: "muted xind" },
+            `${(STAGE_BADGE[best.stage] || [best.stage])[0]} · ${best.disease}`)
+        : el("span", { class: "muted" }, "—")),
+      el("td", { class: "num muted" }, `#${t.lit_rank}`));
+  }));
+}
+
+function targetRankDelta(t) {
+  if (targetWeightsAreDefault() || !t.delta) return null;
+  const up = t.delta > 0;
+  return el("span", { class: `delta ${up ? "delta-up" : "delta-down"}`,
+    title: `Default-weight rank #${t.rank}` },
+    `${up ? "▲" : "▼"} ${Math.abs(t.delta)}`);
+}
+
+/* ---------- target detail ---------- */
+function criterionRow(t, c) {
+  const score = t.s[c.id] || 0;
+  const contribution = score * c.weight;
+  return el("div", { class: "criterion" },
+    el("div", { class: "breakdown-row" },
+      el("span", { class: "criterion-label" }, c.label,
+        el("span", { class: "criterion-weight" }, `×${c.weight.toFixed(2)}`)),
+      el("div", { class: "track" },
+        el("div", { class: "fill",
+          style: `width:${score * 100}%;background:${PILLAR_COLORS[c.pillar]}` })),
+      el("span", { class: "num" }, score.toFixed(2))),
+    el("div", { class: "criterion-detail" }, t.d[c.id] || "—"),
+    el("div", { class: "criterion-meta" },
+      el("span", {}, c.help),
+      el("span", { class: "criterion-source" }, c.source)));
+}
+
+function pillarCard(t, pillar) {
+  const meta = state.targetMeta;
+  const criteria = meta.criteria.filter(c => c.pillar === pillar.id);
+  const score = t.p[pillar.id];
+  const weight = state.targetWeights[pillar.id];
+  return el("div", { class: "card pillar-card" },
+    el("div", { class: "pillar-head" },
+      el("h2", {}, pillar.label),
+      el("div", { class: "pillar-score" },
+        el("span", { class: "pillar-value", style: `color:${PILLAR_COLORS[pillar.id]}` },
+          score.toFixed(2)),
+        el("span", { class: "muted" }, `× ${Math.round(weight * 100)}% weight`))),
+    el("p", { class: "sub" }, pillar.help),
+    el("div", { class: "pillar-bar" },
+      el("div", { class: "fill",
+        style: `width:${score * 100}%;background:${PILLAR_COLORS[pillar.id]}` })),
+    ...criteria.map(c => criterionRow(t, c)));
+}
+
+function crossDrugCard(t) {
+  const drugs = t.cross_drugs || [];
+  if (!drugs.length) return null;
+  return el("div", { class: "card" },
+    el("h2", {}, "Drugs against this target in other immune-mediated diseases"),
+    el("p", { class: "sub" },
+      "Proven human pharmacology one indication away from lupus. Sourced from Open " +
+      "Targets / ChEMBL across " + state.targetMeta.cross_indications.length +
+      " curated immune-mediated indications; lupus itself is excluded."),
+    el("table", { class: "data" },
+      el("thead", {}, el("tr", {},
+        el("th", {}, "Drug"), el("th", {}, "Stage"), el("th", {}, "Indication"),
+        el("th", {}, "Action"), el("th", {}, "Type"))),
+      el("tbody", {}, ...drugs.map(d => {
+        const [label, cls] = STAGE_BADGE[d.stage] || [d.stage, "stage-1"];
+        return el("tr", {},
+          el("td", {}, el("a", {
+            href: `https://platform.opentargets.org/search?q=${encodeURIComponent(d.drug)}`,
+            target: "_blank", rel: "noopener" }, d.drug)),
+          el("td", {}, el("span", { class: `badge drug-badge ${cls}` }, label)),
+          el("td", {}, d.disease),
+          el("td", { class: "muted" }, d.action || "—"),
+          el("td", { class: "muted" }, (d.type || "").toLowerCase() || "—"));
+      }))));
+}
+
+function showTargetDetail(symbol) {
+  const t = state.targetRanked.find(x => x.symbol === symbol);
+  if (!t) return;
+  setHash({ target: symbol });
+  const meta = state.targetMeta;
+  const best = (t.cross_drugs || [])[0];
+  const view = document.getElementById("view-detail");
+  const leaderboardGene = state.geneBySymbol.get(symbol);
+
+  view.replaceChildren(
+    el("button", { class: "back-btn", onclick: () => switchView("targets") },
+      "← Back to target opportunities"),
+    el("div", { class: "detail-head" },
+      el("h2", {}, t.symbol),
+      el("span", { class: "muted" }, t.name),
+      ...flagBadges(t),
+      el("a", { href: `https://platform.opentargets.org/target/${symbol}`,
+        target: "_blank", rel: "noopener" }, "Open Targets ↗"),
+      el("a", { href: `https://www.ncbi.nlm.nih.gov/gene/${t.entrez}`,
+        target: "_blank", rel: "noopener" }, "NCBI Gene ↗")),
+    el("div", { class: "kpi-row" },
+      statTile("Opportunity score", t.tos.toFixed(1),
+        `rank #${t.liveRank} of ${fmt(state.targets.length)}` +
+        (targetWeightsAreDefault() ? "" : " · custom weights")),
+      statTile("SLE programme", t.sle_stage
+        ? (STAGE_BADGE[t.sle_stage] || [t.sle_stage])[0] : "none",
+        t.sle_stage ? (t.sle_drugs || []).slice(0, 2).map(d => d.drug).join(", ")
+                    : "the space is open"),
+      statTile("Elsewhere", best ? (STAGE_BADGE[best.stage] || [best.stage])[0] : "—",
+        best ? `${best.drug} · ${best.disease}` : "no immune-mediated precedent"),
+      statTile("Literature rank", `#${t.lit_rank}`,
+        `${fmt(t.papers)} lupus papers · ${t.trend}`)),
+    el("div", { class: "card" },
+      el("h2", {}, "How the score is built"),
+      el("p", { class: "sub" },
+        "Each criterion is normalized 0–1 and combined within its pillar; the pillars " +
+        "are then combined under the weights you set. Every number below names the " +
+        "database it came from."),
+      el("div", { class: "pillar-summary" },
+        ...meta.pillars.map(p => el("div", { class: "pillar-summary-row" },
+          el("span", { class: "criterion-label" }, p.label,
+            el("span", { class: "criterion-weight" },
+              `×${state.targetWeights[p.id].toFixed(2)}`)),
+          el("div", { class: "track" },
+            el("div", { class: "fill",
+              style: `width:${t.p[p.id] * 100}%;background:${PILLAR_COLORS[p.id]}` })),
+          el("span", { class: "num" }, t.p[p.id].toFixed(2))))),
+      t.gate < 0.999
+        ? el("p", { class: "gate-note" },
+            `Evidence gate: the weighted total is scaled to ${Math.round(t.gate * 100)}% ` +
+            `because the evidence pillar (${t.p.evidence.toFixed(2)}) sits below ` +
+            `${meta.evidence_gate.full}. Druggability cannot substitute for a missing ` +
+            "link to lupus.")
+        : el("p", { class: "gate-note gate-clear" },
+            "Evidence gate: no penalty — the lupus link is strong enough to take the " +
+            "score at face value.")),
+    ...meta.pillars.map(p => pillarCard(t, p)),
+    crossDrugCard(t),
+    drugCard({ symbol: t.symbol, drugs: t.sle_drugs }),
+    el("div", { class: "card" },
+      el("h2", {}, "Protein context"),
+      el("div", { class: "context-grid" },
+        el("div", {},
+          el("div", { class: "label" }, "Protein class"),
+          el("div", {}, t.classes.length ? t.classes.join(" · ") : "not assigned")),
+        el("div", {},
+          el("div", { class: "label" }, "Subcellular location"),
+          el("div", {}, t.locations.length ? t.locations.join(" · ") : "not annotated")),
+        el("div", {},
+          el("div", { class: "label" }, "Validated interaction partners"),
+          el("div", {}, t.partners.length
+            ? t.partners.join(", ")
+            : "none among targets with an SLE programme at Phase 2+")))),
+    leaderboardGene
+      ? el("div", { class: "card" },
+          el("h2", {}, "Literature view"),
+          el("p", { class: "sub" },
+            `${t.symbol} ranks #${t.lit_rank} on the literature leaderboard with ` +
+            `${fmt(t.papers)} lupus papers.`),
+          el("button", { class: "back-btn", onclick: () => showDetail(symbol) },
+            `Open the full literature page for ${t.symbol} →`))
+      : null,
+  );
+  switchView("detail", { keepHash: true });
+  window.scrollTo({ top: 0 });
+}
+
 /* ---------- view switching ---------- */
 function switchView(name, { keepHash } = {}) {
   for (const tab of document.querySelectorAll(".tab")) {
@@ -1086,11 +1532,12 @@ function switchView(name, { keepHash } = {}) {
     tab.classList.toggle("active", active);
     tab.setAttribute("aria-selected", String(active));
   }
-  for (const v of ["genes", "pathways", "compare", "about", "detail"]) {
+  for (const v of ["genes", "targets", "pathways", "compare", "about", "detail"]) {
     document.getElementById(`view-${v}`).hidden = v !== name;
   }
   if (!keepHash) setHash();   // drops #gene= but preserves any custom weighting
   if (name === "genes") renderGenesView();
+  if (name === "targets") renderTargetsView();
   if (name === "pathways") renderPathwaysView();
   if (name === "compare") renderCompareView();
   if (name === "about") renderAboutView();
@@ -1104,6 +1551,10 @@ async function boot() {
         if (!r.ok) throw new Error(`${name}.json: HTTP ${r.status}`);
         return r.json();
       })));
+  // Target scoring is a separate pipeline step; the dashboard still works
+  // without it, so a missing file hides the tab rather than breaking the page.
+  const targets = await fetch("data/targets.json")
+    .then(r => (r.ok ? r.json() : null)).catch(() => null);
   state.genes = genes.genes;
   state.meta = meta;
   state.pathways = pathways.pathways;
@@ -1115,6 +1566,16 @@ async function boot() {
   state.weights = readWeightsFromHash() || { ...meta.weights };
   rescore();
 
+  const targetsTab = document.querySelector('.tab[data-view="targets"]');
+  if (targets && targets.targets.length) {
+    state.targetMeta = targets;
+    state.targets = targets.targets;
+    state.targetWeights = readTargetWeightsFromHash() || { ...targets.pillar_weights };
+    rescoreTargets();
+  } else if (targetsTab) {
+    targetsTab.remove();
+  }
+
   document.getElementById("loading").remove();
   document.getElementById("provenance").textContent =
     `Last updated ${meta.updated} · ${fmt(meta.corpus_articles)} articles · query: ${meta.query}`;
@@ -1122,8 +1583,11 @@ async function boot() {
   for (const tab of document.querySelectorAll(".tab")) {
     tab.addEventListener("click", () => switchView(tab.dataset.view));
   }
-  const hashGene = new URLSearchParams(location.hash.slice(1)).get("gene");
-  if (hashGene && state.ranked.some(g => g.symbol === hashGene)) showDetail(hashGene);
+  const params = new URLSearchParams(location.hash.slice(1));
+  const hashGene = params.get("gene");
+  const hashTarget = params.get("target");
+  if (hashTarget && state.targetRanked.some(t => t.symbol === hashTarget)) showTargetDetail(hashTarget);
+  else if (hashGene && state.ranked.some(g => g.symbol === hashGene)) showDetail(hashGene);
   else switchView("genes");
 }
 

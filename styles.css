@@ -312,7 +312,66 @@ tr.gene-row:hover td, tr.gene-row:focus-within td { background: var(--wash); }
 .muted { color: var(--muted); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
+
+/* ---- target opportunity tab ---- */
+.intro-card p { margin: 0 0 10px; }
+.intro-card p:last-child { margin-bottom: 0; }
+.intro-card .sub { margin-bottom: 10px; }
+
+/* Compact four-pillar strip in the ranked table: one column per pillar,
+   height encodes the score. */
+.pillar-strip { display: inline-flex; gap: 4px; align-items: flex-end; height: 26px; }
+.pillar-cell {
+  width: 13px; height: 100%; background: var(--grid); border-radius: 2px;
+  display: flex; align-items: flex-end; overflow: hidden; cursor: default;
+}
+.pillar-fill { width: 100%; border-radius: 2px; }
+
+.flag-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.badge.flag { font-size: 11px; cursor: default; }
+.badge.flag-repurposing { border-color: var(--series-3); color: var(--series-3); }
+.badge.flag-whitespace { border-color: var(--series-1); color: var(--series-1); }
+.badge.flag-safety { border-color: var(--organ-heart); color: var(--organ-heart); }
+.badge.flag-approved { border-color: var(--muted); color: var(--muted); }
+.xind { font-size: 12.5px; }
+
+.pillar-card { padding-bottom: 6px; }
+.pillar-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.pillar-score { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+.pillar-value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pillar-bar { height: 6px; border-radius: 3px; background: var(--grid); margin: 8px 0 14px; }
+.pillar-bar .fill { height: 6px; border-radius: 3px; }
+
+.criterion { padding: 10px 0; border-top: 1px solid var(--border); }
+.criterion:first-of-type { border-top: none; }
+.criterion .breakdown-row { margin: 0 0 5px; }
+.criterion-label { display: flex; align-items: baseline; gap: 6px; }
+.criterion-weight { color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.criterion-detail { font-size: 13px; color: var(--ink); margin: 0 0 3px; }
+.criterion-meta {
+  display: flex; gap: 12px; justify-content: space-between; align-items: baseline;
+  font-size: 12px; color: var(--muted);
+}
+.criterion-source { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.pillar-summary { margin: 10px 0 4px; }
+.pillar-summary-row { display: grid; grid-template-columns: 150px 1fr 60px; gap: 10px; align-items: center; margin: 7px 0; font-size: 13.5px; }
+.pillar-summary-row .track { height: 10px; border-radius: 5px; background: var(--grid); }
+.pillar-summary-row .fill { height: 10px; border-radius: 5px; }
+.pillar-summary-row .num { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+
+.gate-note {
+  margin: 12px 0 0; padding: 9px 11px; border-radius: 6px; font-size: 12.5px;
+  background: var(--wash); color: var(--ink-2); border-left: 3px solid var(--series-2);
+}
+.gate-note.gate-clear { border-left-color: var(--series-3); }
+
+.context-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.context-grid .label { color: var(--muted); font-size: 12px; margin-bottom: 3px; }
+
 @media (max-width: 640px) {
   .gene-name { display: none; }
   .breakdown-row { grid-template-columns: 110px 1fr 50px; }
+  .pillar-summary-row { grid-template-columns: 110px 1fr 50px; }
+  .criterion-meta { flex-direction: column; gap: 2px; }
 }
