@@ -133,20 +133,23 @@ a:hover { text-decoration: underline; }
 .weight-row { display: grid; grid-template-columns: 96px 1fr 42px; align-items: center; gap: 10px; }
 .weight-label { font-size: 13px; color: var(--ink-2); }
 .weight-val { font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; color: var(--ink); font-weight: 600; }
-.weight-row input[type="range"] {
+.weight-row input[type="range"], .tw-row input[type="range"] {
   -webkit-appearance: none; appearance: none; width: 100%; height: 4px;
   background: var(--grid); border-radius: 2px; outline: none; cursor: pointer;
 }
-.weight-row input[type="range"]::-webkit-slider-thumb {
+.weight-row input[type="range"]::-webkit-slider-thumb,
+.tw-row input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
   border-radius: 50%; background: var(--series-1);
   border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border);
 }
-.weight-row input[type="range"]::-moz-range-thumb {
+.weight-row input[type="range"]::-moz-range-thumb,
+.tw-row input[type="range"]::-moz-range-thumb {
   width: 14px; height: 14px; border-radius: 50%; background: var(--series-1);
   border: 2px solid var(--surface);
 }
-.weight-row input[type="range"]:focus-visible { box-shadow: 0 0 0 3px var(--wash); }
+.weight-row input[type="range"]:focus-visible,
+.tw-row input[type="range"]:focus-visible { box-shadow: 0 0 0 3px var(--wash); }
 
 .delta { font-size: 11px; font-weight: 600; margin-left: 7px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .delta-up { color: var(--good-text); }
@@ -314,6 +317,12 @@ tr.gene-row:hover td, tr.gene-row:focus-within td { background: var(--wash); }
 
 
 /* ---- target opportunity tab ---- */
+/* Pillar sliders carry a sentence of explanation each, so they stack rather
+   than sharing the leaderboard's single-line label / slider / value grid. */
+.tw-row { display: flex; flex-direction: column; gap: 6px; padding: 4px 0 10px; }
+.tw-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.tw-help { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.45; }
+
 .intro-card p { margin: 0 0 10px; }
 .intro-card p:last-child { margin-bottom: 0; }
 .intro-card .sub { margin-bottom: 10px; }
@@ -333,7 +342,16 @@ tr.gene-row:hover td, tr.gene-row:focus-within td { background: var(--wash); }
 .badge.flag-whitespace { border-color: var(--series-1); color: var(--series-1); }
 .badge.flag-safety { border-color: var(--organ-heart); color: var(--organ-heart); }
 .badge.flag-approved { border-color: var(--muted); color: var(--muted); }
-.xind { font-size: 12.5px; }
+/* One line, truncated — the full "drug — stage in indication" is on the
+   title attribute. Without this the column wraps to three lines and shoves
+   the rest of the table off the page. */
+/* This table carries two more columns than the leaderboard, so the gene-name
+   column gets a tighter cap to keep the row inside the page. */
+#view-targets .gene-name { max-width: 200px; }
+.xind {
+  font-size: 12.5px; display: block; max-width: 150px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 .pillar-card { padding-bottom: 6px; }
 .pillar-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }

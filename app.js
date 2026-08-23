@@ -163,6 +163,7 @@ const STAGE_BADGE = {
   PHASE_1_2: ["Phase 1/2", "stage-2"],
   PHASE_1: ["Phase 1", "stage-1"],
   PRECLINICAL: ["Preclinical", "stage-1"],
+  UNKNOWN: ["Unspecified", "stage-1"],   // ChEMBL row with no stage recorded
 };
 function drugBadge(g) {
   const stage = g.drug_stage;
@@ -1195,13 +1196,13 @@ function targetWeightPanel() {
       value: String(targetSliderRaw[pillar.id]),
       "aria-label": `${pillar.label} weight`,
       oninput: e => { targetSliderRaw[pillar.id] = Number(e.target.value); queueTargetRescore(); } });
-    return el("div", { class: "weight-row" },
-      el("div", { class: "weight-head" },
+    return el("div", { class: "tw-row" },
+      el("div", { class: "tw-row-head" },
         el("span", { class: "weight-label" }, pillar.label),
         el("span", { class: "weight-val", id: `twval-${pillar.id}` },
           `${Math.round(state.targetWeights[pillar.id] * 100)}%`)),
       input,
-      el("p", { class: "weight-help" }, pillar.help));
+      el("p", { class: "tw-help" }, pillar.help));
   });
   return el("div", { class: "card weight-card" },
     el("div", { class: "weight-card-head" },
@@ -1360,7 +1361,8 @@ function renderTargetTable() {
         ? drugBadge({ drug_stage: t.sle_stage, drugs: t.sle_drugs })
         : el("span", { class: "muted" }, "open")),
       el("td", {}, best
-        ? el("span", { class: "muted xind" },
+        ? el("span", { class: "muted xind",
+            title: `${best.drug} — ${(STAGE_BADGE[best.stage] || [best.stage])[0]} in ${best.disease}` },
             `${(STAGE_BADGE[best.stage] || [best.stage])[0]} · ${best.disease}`)
         : el("span", { class: "muted" }, "—")),
       el("td", { class: "num muted" }, `#${t.lit_rank}`));
