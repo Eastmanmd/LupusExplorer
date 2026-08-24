@@ -1,0 +1,195 @@
+[
+ {
+  "cutoff": 2010,
+  "n_universe": 655,
+  "n_pos": 16,
+  "auc": 0.862,
+  "median_pct": 0.111,
+  "p": 0.0001,
+  "positives": [
+   "IFNG",
+   "TLR7",
+   "CD40",
+   "CD19",
+   "IL12B",
+   "CD28",
+   "BCL2",
+   "IL17A",
+   "IFNB1",
+   "IGHE",
+   "IL21",
+   "ICOS",
+   "TNFRSF13C",
+   "CD38",
+   "TYK2",
+   "CLEC4C"
+  ]
+ },
+ {
+  "cutoff": 2011,
+  "n_universe": 707,
+  "n_pos": 16,
+  "auc": 0.882,
+  "median_pct": 0.105,
+  "p": 0.0002,
+  "positives": [
+   "IFNG",
+   "TLR7",
+   "CD40",
+   "CD19",
+   "IL17A",
+   "IL12B",
+   "CD28",
+   "BCL2",
+   "IL21",
+   "IFNB1",
+   "IGHE",
+   "TNFRSF13C",
+   "CD38",
+   "ICOS",
+   "TYK2",
+   "CLEC4C"
+  ]
+ },
+ {
+  "cutoff": 2012,
+  "n_universe": 745,
+  "n_pos": 14,
+  "auc": 0.879,
+  "median_pct": 0.09,
+  "p": 0.0001,
+  "positives": [
+   "IL17A",
+   "TLR7",
+   "CD19",
+   "CD40",
+   "IL12B",
+   "CD28",
+   "BCL2",
+   "IFNB1",
+   "IGHE",
+   "TNFRSF13C",
+   "ICOS",
+   "CD38",
+   "TYK2",
+   "CLEC4C"
+  ]
+ },
+ {
+  "cutoff": 2013,
+  "n_universe": 792,
+  "n_pos": 14,
+  "auc": 0.875,
+  "median_pct": 0.078,
+  "p": 0.0001,
+  "positives": [
+   "IL17A",
+   "TLR7",
+   "CD19",
+   "CD40",
+   "IL12B",
+   "CD28",
+   "BCL2",
+   "IFNB1",
+   "TNFRSF13C",
+   "CD38",
+   "ICOS",
+   "BTK",
+   "TYK2",
+   "CLEC4C"
+  ]
+ },
+ {
+  "cutoff": 2014,
+  "n_universe": 825,
+  "n_pos": 13,
+  "auc": 0.87,
+  "median_pct": 0.078,
+  "p": 0.0001,
+  "positives": [
+   "IL17A",
+   "TLR7",
+   "CD19",
+   "CD40",
+   "IL12B",
+   "IFNB1",
+   "BCL2",
+   "CD38",
+   "TNFRSF13C",
+   "ICOS",
+   "BTK",
+   "TYK2",
+   "CLEC4C"
+  ]
+ },
+ {
+  "cutoff": 2015,
+  "n_universe": 866,
+  "n_pos": 11,
+  "auc": 0.875,
+  "median_pct": 0.08,
+  "p": 0.0002,
+  "positives": [
+   "IL17A",
+   "TLR7",
+   "CD19",
+   "CD40",
+   "IFNB1",
+   "BCL2",
+   "CD38",
+   "TNFRSF13C",
+   "BTK",
+   "TYK2",
+   "CLEC4C"
+  ]
+ },
+ {
+  "cutoff": 2016,
+  "n_universe": 916,
+  "n_pos": 9,
+  "auc": 0.849,
+  "median_pct": 0.071,
+  "p": 0.0002,
+  "positives": [
+   "IL17A",
+   "TLR7",
+   "CD40",
+   "IFNB1",
+   "BCL2",
+   "CD38",
+   "TNFRSF13C",
+   "TYK2",
+   "S1PR1"
+  ]
+ },
+ {
+  "cutoff": 2017,
+  "n_universe": 968,
+  "n_pos": 6,
+  "auc": 0.896,
+  "median_pct": 0.123,
+  "p": 0.0027,
+  "positives": [
+   "IL17A",
+   "TLR7",
+   "IFNB1",
+   "CD38",
+   "TNFRSF13C",
+   "TYK2"
+  ]
+ },
+ {
+  "cutoff": 2018,
+  "n_universe": 1009,
+  "n_pos": 4,
+  "auc": 0.932,
+  "median_pct": 0.108,
+  "p": 0.0062,
+  "positives": [
+   "TLR7",
+   "IFNB1",
+   "CD38",
+   "TNFRSF13C"
+  ]
+ }
+]

@@ -1,0 +1,620 @@
+{
+ "cutoff": 2015,
+ "candidates": [
+  {
+   "symbol": "TLR7",
+   "in_top300": true,
+   "lit_rank": 1,
+   "top_stage": "APPROVAL",
+   "drugs": [
+    "Afimetoran",
+    "Enpatoran"
+   ]
+  },
+  {
+   "symbol": "TNFSF13B",
+   "in_top300": true,
+   "lit_rank": 2,
+   "top_stage": "APPROVAL",
+   "drugs": [
+    "Atacicept",
+    "Belimumab",
+    "Blisibimod",
+    "Rozibafusp Alfa",
+    "Tabalumab"
+   ]
+  },
+  {
+   "symbol": "TNF",
+   "in_top300": true,
+   "lit_rank": 4,
+   "top_stage": "PHASE_2_3",
+   "drugs": [
+    "Infliximab"
+   ]
+  },
+  {
+   "symbol": "IL6",
+   "in_top300": true,
+   "lit_rank": 6,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Pacibekitug",
+    "Sirukumab"
+   ]
+  },
+  {
+   "symbol": "IFNG",
+   "in_top300": true,
+   "lit_rank": 11,
+   "top_stage": "PHASE_1",
+   "drugs": [
+    "Amg-811"
+   ]
+  },
+  {
+   "symbol": "IL17A",
+   "in_top300": true,
+   "lit_rank": 17,
+   "top_stage": "PHASE_1",
+   "drugs": [
+    "Vunakizumab"
+   ]
+  },
+  {
+   "symbol": "TYK2",
+   "in_top300": true,
+   "lit_rank": 19,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Brepocitinib",
+    "Deucravacitinib",
+    "Filgotinib",
+    "Gusacitinib",
+    "Tofacitinib",
+    "Upadacitinib"
+   ]
+  },
+  {
+   "symbol": "CD19",
+   "in_top300": true,
+   "lit_rank": 20,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Blinatumomab",
+    "Inebilizumab",
+    "Obecabtagene Autoleucel",
+    "Obexelimab",
+    "Tafasitamab"
+   ]
+  },
+  {
+   "symbol": "IL12B",
+   "in_top300": true,
+   "lit_rank": 30,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Ustekinumab"
+   ]
+  },
+  {
+   "symbol": "CD40LG",
+   "in_top300": true,
+   "lit_rank": 31,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Dapirolizumab Pegol"
+   ]
+  },
+  {
+   "symbol": "CD40",
+   "in_top300": true,
+   "lit_rank": 35,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Cd40 Ligand",
+    "Iscalimab"
+   ]
+  },
+  {
+   "symbol": "IFNAR1",
+   "in_top300": true,
+   "lit_rank": 41,
+   "top_stage": "APPROVAL",
+   "drugs": [
+    "Anifrolumab"
+   ]
+  },
+  {
+   "symbol": "FCGR2B",
+   "in_top300": true,
+   "lit_rank": 45,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Obexelimab"
+   ]
+  },
+  {
+   "symbol": "JAK2",
+   "in_top300": true,
+   "lit_rank": 51,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Baricitinib",
+    "Filgotinib",
+    "Gusacitinib",
+    "Tofacitinib",
+    "Upadacitinib"
+   ]
+  },
+  {
+   "symbol": "JAK1",
+   "in_top300": true,
+   "lit_rank": 56,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Abrocitinib",
+    "Baricitinib",
+    "Brepocitinib",
+    "Filgotinib",
+    "Gusacitinib",
+    "Solcitinib",
+    "Tofacitinib",
+    "Upadacitinib"
+   ]
+  },
+  {
+   "symbol": "IL21",
+   "in_top300": true,
+   "lit_rank": 61,
+   "top_stage": "PHASE_1",
+   "drugs": [
+    "Nnc0114-0006"
+   ]
+  },
+  {
+   "symbol": "IL23A",
+   "in_top300": true,
+   "lit_rank": 65,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Ustekinumab"
+   ]
+  },
+  {
+   "symbol": "CD80",
+   "in_top300": true,
+   "lit_rank": 71,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Abatacept"
+   ]
+  },
+  {
+   "symbol": "TNFRSF13C",
+   "in_top300": true,
+   "lit_rank": 74,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Ianalumab"
+   ]
+  },
+  {
+   "symbol": "IFNB1",
+   "in_top300": true,
+   "lit_rank": 78,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Dazukibart"
+   ]
+  },
+  {
+   "symbol": "CD28",
+   "in_top300": true,
+   "lit_rank": 82,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Lulizumab Pegol",
+    "Tgn-1412"
+   ]
+  },
+  {
+   "symbol": "CD38",
+   "in_top300": true,
+   "lit_rank": 89,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Daratumumab",
+    "Felzartamab",
+    "Mezagitamab"
+   ]
+  },
+  {
+   "symbol": "NR3C1",
+   "in_top300": true,
+   "lit_rank": 93,
+   "top_stage": "APPROVAL",
+   "drugs": [
+    "Methylprednisolone Acetate",
+    "Triamcinolone Hexacetonide"
+   ]
+  },
+  {
+   "symbol": "CD22",
+   "in_top300": true,
+   "lit_rank": 99,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Epratuzumab"
+   ]
+  },
+  {
+   "symbol": "TLR8",
+   "in_top300": true,
+   "lit_rank": 100,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Afimetoran",
+    "Enpatoran"
+   ]
+  },
+  {
+   "symbol": "CD86",
+   "in_top300": true,
+   "lit_rank": 101,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Abatacept"
+   ]
+  },
+  {
+   "symbol": "BCL2",
+   "in_top300": true,
+   "lit_rank": 115,
+   "top_stage": "PHASE_1_2",
+   "drugs": [
+    "Apg-2575",
+    "Venetoclax"
+   ]
+  },
+  {
+   "symbol": "BTK",
+   "in_top300": true,
+   "lit_rank": 118,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Branebrutinib",
+    "Elsubrutinib",
+    "Evobrutinib",
+    "Fenebrutinib",
+    "Msc-2364447",
+    "Orelabrutinib"
+   ]
+  },
+  {
+   "symbol": "IGHE",
+   "in_top300": true,
+   "lit_rank": 120,
+   "top_stage": "PHASE_1",
+   "drugs": [
+    "Omalizumab"
+   ]
+  },
+  {
+   "symbol": "ICOS",
+   "in_top300": true,
+   "lit_rank": 129,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Medi-570",
+    "Rozibafusp Alfa"
+   ]
+  },
+  {
+   "symbol": "CLEC4C",
+   "in_top300": true,
+   "lit_rank": 135,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Litifilimab"
+   ]
+  },
+  {
+   "symbol": "SYK",
+   "in_top300": true,
+   "lit_rank": 146,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Fostamatinib Disodium",
+    "Gusacitinib",
+    "Lanraplenib",
+    "R-333"
+   ]
+  },
+  {
+   "symbol": "MS4A1",
+   "in_top300": true,
+   "lit_rank": 169,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Mosunetuzumab",
+    "Obinutuzumab",
+    "Ocrelizumab",
+    "Rituximab",
+    "Tru-015",
+    "Veltuzumab"
+   ]
+  },
+  {
+   "symbol": "IL3RA",
+   "in_top300": true,
+   "lit_rank": 212,
+   "top_stage": "PHASE_1",
+   "drugs": [
+    "Talacotuzumab"
+   ]
+  },
+  {
+   "symbol": "IL12A",
+   "in_top300": true,
+   "lit_rank": 240,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Ustekinumab"
+   ]
+  },
+  {
+   "symbol": "TNFSF13",
+   "in_top300": true,
+   "lit_rank": 243,
+   "top_stage": "PHASE_2_3",
+   "drugs": [
+    "Atacicept"
+   ]
+  },
+  {
+   "symbol": "S1PR1",
+   "in_top300": true,
+   "lit_rank": 244,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Amiselimod",
+    "Cenerimod"
+   ]
+  },
+  {
+   "symbol": "HSPA8",
+   "in_top300": true,
+   "lit_rank": 252,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Forigerimod",
+    "Forigerimod Acetate"
+   ]
+  },
+  {
+   "symbol": "JAK3",
+   "in_top300": true,
+   "lit_rank": 260,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Filgotinib",
+    "Gusacitinib",
+    "R-333",
+    "Tofacitinib",
+    "Upadacitinib"
+   ]
+  },
+  {
+   "symbol": "CD6",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_1",
+   "drugs": [
+    "Itolizumab"
+   ]
+  },
+  {
+   "symbol": "CRBN",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Iberdomide"
+   ]
+  },
+  {
+   "symbol": "DDB1",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Iberdomide"
+   ]
+  },
+  {
+   "symbol": "CUL4A",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Iberdomide"
+   ]
+  },
+  {
+   "symbol": "RBX1",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Iberdomide"
+   ]
+  },
+  {
+   "symbol": "PPP3CA",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Voclosporin"
+   ]
+  },
+  {
+   "symbol": "IL6R",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Tocilizumab",
+    "Vobarilizumab"
+   ]
+  },
+  {
+   "symbol": "IRAK4",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_1",
+   "drugs": [
+    "Zimlovisertib"
+   ]
+  },
+  {
+   "symbol": "MASP2",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Narsoplimab"
+   ]
+  },
+  {
+   "symbol": "CD3E",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Blinatumomab",
+    "Mosunetuzumab"
+   ]
+  },
+  {
+   "symbol": "CD3G",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Blinatumomab",
+    "Mosunetuzumab"
+   ]
+  },
+  {
+   "symbol": "CD3D",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Blinatumomab",
+    "Mosunetuzumab"
+   ]
+  },
+  {
+   "symbol": "ICOSLG",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Amg-557"
+   ]
+  },
+  {
+   "symbol": "FCGRT",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_3",
+   "drugs": [
+    "Nipocalimab"
+   ]
+  },
+  {
+   "symbol": "LILRA4",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_2",
+   "drugs": [
+    "Daxdilimab"
+   ]
+  },
+  {
+   "symbol": "CD74",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_1",
+   "drugs": [
+    "Milatuzumab"
+   ]
+  },
+  {
+   "symbol": "CD52",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_1",
+   "drugs": [
+    "Alemtuzumab"
+   ]
+  },
+  {
+   "symbol": "S1PR5",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_1",
+   "drugs": [
+    "Amiselimod"
+   ]
+  },
+  {
+   "symbol": "S1PR2",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_1",
+   "drugs": [
+    "Amiselimod"
+   ]
+  },
+  {
+   "symbol": "S1PR4",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_1",
+   "drugs": [
+    "Amiselimod"
+   ]
+  },
+  {
+   "symbol": "S1PR3",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_1",
+   "drugs": [
+    "Amiselimod"
+   ]
+  },
+  {
+   "symbol": "ROCK2",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_1",
+   "drugs": [
+    "Belumosudil"
+   ]
+  },
+  {
+   "symbol": "ROCK1",
+   "in_top300": false,
+   "lit_rank": null,
+   "top_stage": "PHASE_1",
+   "drugs": [
+    "Belumosudil"
+   ]
+  }
+ ]
+}

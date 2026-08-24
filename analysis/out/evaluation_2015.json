@@ -1,0 +1,11 @@
+{
+ "cutoff": 2015,
+ "auc": 0.8370516455072107,
+ "n_universe": 873,
+ "n_positives": 19,
+ "median_percentile": 0.10309278350515463,
+ "unrankable_positives": [
+  "S1PR1",
+  "JAK3"
+ ]
+}

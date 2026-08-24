@@ -1,0 +1,186 @@
+[
+ {
+  "cutoff": 2010,
+  "n_universe": 656,
+  "n_pos": 18,
+  "auc": 0.781,
+  "median_pct": 0.203,
+  "p": 0.0009,
+  "positives": [
+   "IL6",
+   "TLR7",
+   "CD19",
+   "IL12B",
+   "CD28",
+   "BCL2",
+   "IL17A",
+   "IGHE",
+   "IL21",
+   "TNFRSF13C",
+   "CD3E",
+   "CD38",
+   "IL3RA",
+   "IFNAR1",
+   "TYK2",
+   "CLEC4C",
+   "IL6R",
+   "MASP2"
+  ]
+ },
+ {
+  "cutoff": 2011,
+  "n_universe": 706,
+  "n_pos": 16,
+  "auc": 0.799,
+  "median_pct": 0.174,
+  "p": 0.0003,
+  "positives": [
+   "TLR7",
+   "CD19",
+   "IL17A",
+   "IL12B",
+   "CD28",
+   "BCL2",
+   "IL21",
+   "IGHE",
+   "TNFRSF13C",
+   "CD38",
+   "CD3E",
+   "IL3RA",
+   "TYK2",
+   "IL6R",
+   "CLEC4C",
+   "MASP2"
+  ]
+ },
+ {
+  "cutoff": 2012,
+  "n_universe": 742,
+  "n_pos": 13,
+  "auc": 0.768,
+  "median_pct": 0.201,
+  "p": 0.0062,
+  "positives": [
+   "IL17A",
+   "TLR7",
+   "CD19",
+   "IL12B",
+   "CD28",
+   "TNFRSF13C",
+   "CD38",
+   "CD3E",
+   "TYK2",
+   "IL3RA",
+   "CLEC4C",
+   "IL6R",
+   "MASP2"
+  ]
+ },
+ {
+  "cutoff": 2013,
+  "n_universe": 789,
+  "n_pos": 14,
+  "auc": 0.781,
+  "median_pct": 0.202,
+  "p": 0.0018,
+  "positives": [
+   "IL17A",
+   "TLR7",
+   "CD19",
+   "IL12B",
+   "CD28",
+   "TNFRSF13C",
+   "CD38",
+   "CD3E",
+   "BTK",
+   "IL3RA",
+   "TYK2",
+   "IL6R",
+   "CLEC4C",
+   "MASP2"
+  ]
+ },
+ {
+  "cutoff": 2014,
+  "n_universe": 821,
+  "n_pos": 12,
+  "auc": 0.79,
+  "median_pct": 0.195,
+  "p": 0.0031,
+  "positives": [
+   "IL17A",
+   "TLR7",
+   "CD19",
+   "IL12B",
+   "CD38",
+   "TNFRSF13C",
+   "CD3E",
+   "IL3RA",
+   "BTK",
+   "TYK2",
+   "IL6R",
+   "MASP2"
+  ]
+ },
+ {
+  "cutoff": 2015,
+  "n_universe": 858,
+  "n_pos": 8,
+  "auc": 0.826,
+  "median_pct": 0.146,
+  "p": 0.0022,
+  "positives": [
+   "IL17A",
+   "TLR7",
+   "CD19",
+   "CD38",
+   "TNFRSF13C",
+   "CD3E",
+   "IL3RA",
+   "MASP2"
+  ]
+ },
+ {
+  "cutoff": 2016,
+  "n_universe": 909,
+  "n_pos": 5,
+  "auc": 0.898,
+  "median_pct": 0.121,
+  "p": 0.0142,
+  "positives": [
+   "IL17A",
+   "TLR7",
+   "CD38",
+   "TNFRSF13C",
+   "CD3E"
+  ]
+ },
+ {
+  "cutoff": 2017,
+  "n_universe": 963,
+  "n_pos": 5,
+  "auc": 0.9,
+  "median_pct": 0.125,
+  "p": 0.0174,
+  "positives": [
+   "IL17A",
+   "TLR7",
+   "CD38",
+   "TNFRSF13C",
+   "CD3E"
+  ]
+ },
+ {
+  "cutoff": 2018,
+  "n_universe": 1003,
+  "n_pos": 3,
+  "auc": 0.936,
+  "median_pct": 0.015,
+  "p": 0.0007,
+  "positives": [
+   "IL17A",
+   "TLR7",
+   "CD3E"
+  ]
+ }
+]

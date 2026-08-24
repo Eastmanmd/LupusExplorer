@@ -1,0 +1,408 @@
+{
+ "BTK": {
+  "year": 2015,
+  "drug": "Evobrutinib",
+  "nct": "NCT02537028",
+  "matched_as": "Evobrutinib",
+  "phase": "PHASE1"
+ },
+ "TNFRSF13C": {
+  "year": 2018,
+  "drug": "Ianalumab",
+  "nct": "NCT03656562",
+  "matched_as": "Ianalumab",
+  "phase": "PHASE2"
+ },
+ "CD80": {
+  "year": 2005,
+  "drug": "Abatacept",
+  "nct": "NCT00119678",
+  "matched_as": "Abatacept",
+  "phase": "PHASE2"
+ },
+ "CD86": {
+  "year": 2005,
+  "drug": "Abatacept",
+  "nct": "NCT00119678",
+  "matched_as": "Abatacept",
+  "phase": "PHASE2"
+ },
+ "MS4A1": {
+  "year": 2002,
+  "drug": "Rituximab",
+  "nct": "NCT00036491",
+  "matched_as": "Rituximab",
+  "phase": "PHASE1,PHASE2"
+ },
+ "JAK3": {
+  "year": 2012,
+  "drug": "R-333",
+  "nct": "NCT01597050",
+  "matched_as": "R-333",
+  "phase": "PHASE2"
+ },
+ "SYK": {
+  "year": 2008,
+  "drug": "Fostamatinib Disodium",
+  "nct": "NCT00752999",
+  "matched_as": "Fostamatinib Disodium",
+  "phase": "PHASE2"
+ },
+ "CD28": {
+  "year": 2014,
+  "drug": "Lulizumab Pegol",
+  "nct": "NCT02265744",
+  "matched_as": "Lulizumab Pegol",
+  "phase": "PHASE2"
+ },
+ "JAK1": {
+  "year": 2015,
+  "drug": "Tofacitinib",
+  "nct": "NCT02535689",
+  "matched_as": "Tofacitinib",
+  "phase": "PHASE1"
+ },
+ "JAK2": {
+  "year": 2015,
+  "drug": "Tofacitinib",
+  "nct": "NCT02535689",
+  "matched_as": "Tofacitinib",
+  "phase": "PHASE1"
+ },
+ "NR3C1": {
+  "year": 1999,
+  "drug": "Methylprednisolone Acetate",
+  "nct": "NCT00001212",
+  "matched_as": "Methylprednisolone Acetate",
+  "phase": "PHASE2"
+ },
+ "TYK2": {
+  "year": 2015,
+  "drug": "Tofacitinib",
+  "nct": "NCT02535689",
+  "matched_as": "Tofacitinib",
+  "phase": "PHASE1"
+ },
+ "CD6": {
+  "year": 2019,
+  "drug": "Itolizumab",
+  "nct": "NCT04128579",
+  "matched_as": "Itolizumab",
+  "phase": "PHASE1"
+ },
+ "TNFSF13B": {
+  "year": 2003,
+  "drug": "Belimumab",
+  "nct": "NCT00071487",
+  "matched_as": "Belimumab",
+  "phase": "PHASE2"
+ },
+ "CRBN": {
+  "year": 2014,
+  "drug": "Iberdomide",
+  "nct": "NCT02185040",
+  "matched_as": "Iberdomide",
+  "phase": "PHASE2"
+ },
+ "DDB1": {
+  "year": 2014,
+  "drug": "Iberdomide",
+  "nct": "NCT02185040",
+  "matched_as": "Iberdomide",
+  "phase": "PHASE2"
+ },
+ "CUL4A": {
+  "year": 2014,
+  "drug": "Iberdomide",
+  "nct": "NCT02185040",
+  "matched_as": "Iberdomide",
+  "phase": "PHASE2"
+ },
+ "RBX1": {
+  "year": 2014,
+  "drug": "Iberdomide",
+  "nct": "NCT02185040",
+  "matched_as": "Iberdomide",
+  "phase": "PHASE2"
+ },
+ "IL21": {
+  "year": 2012,
+  "drug": "Nnc0114-0006",
+  "nct": "NCT01689025",
+  "matched_as": "Nnc0114-0006",
+  "phase": "PHASE1"
+ },
+ "PPP3CA": {
+  "year": 2014,
+  "drug": "Voclosporin",
+  "nct": "NCT02141672",
+  "matched_as": "Voclosporin",
+  "phase": "PHASE2"
+ },
+ "IGHE": {
+  "year": 2012,
+  "drug": "Omalizumab",
+  "nct": "NCT01716312",
+  "matched_as": "Omalizumab",
+  "phase": "PHASE1"
+ },
+ "CD38": {
+  "year": 2018,
+  "drug": "Mezagitamab",
+  "nct": "NCT03724916",
+  "matched_as": "TAK-079",
+  "phase": "PHASE1"
+ },
+ "IFNG": {
+  "year": 2009,
+  "drug": "Amg-811",
+  "nct": "NCT00818948",
+  "matched_as": "Amg-811",
+  "phase": "PHASE1"
+ },
+ "IL6R": {
+  "year": 2015,
+  "drug": "Vobarilizumab",
+  "nct": "NCT02437890",
+  "matched_as": "Vobarilizumab",
+  "phase": "PHASE2"
+ },
+ "ICOS": {
+  "year": 2008,
+  "drug": "Medi-570",
+  "nct": "NCT00774943",
+  "matched_as": "AMG 557",
+  "phase": "PHASE1"
+ },
+ "IL6": {
+  "year": 2011,
+  "drug": "Sirukumab",
+  "nct": "NCT01273389",
+  "matched_as": "Sirukumab",
+  "phase": "PHASE2"
+ },
+ "IL12B": {
+  "year": 2015,
+  "drug": "Ustekinumab",
+  "nct": "NCT02349061",
+  "matched_as": "Ustekinumab",
+  "phase": "PHASE2"
+ },
+ "IL12A": {
+  "year": 2015,
+  "drug": "Ustekinumab",
+  "nct": "NCT02349061",
+  "matched_as": "Ustekinumab",
+  "phase": "PHASE2"
+ },
+ "IL23A": {
+  "year": 2015,
+  "drug": "Ustekinumab",
+  "nct": "NCT02349061",
+  "matched_as": "Ustekinumab",
+  "phase": "PHASE2"
+ },
+ "TLR7": {
+  "year": 2020,
+  "drug": "Afimetoran",
+  "nct": "NCT04493541",
+  "matched_as": "BMS-986256",
+  "phase": "PHASE1"
+ },
+ "TNFSF13": {
+  "year": 2007,
+  "drug": "Atacicept",
+  "nct": "NCT00573157",
+  "matched_as": "Atacicept",
+  "phase": "PHASE2,PHASE3"
+ },
+ "MASP2": {
+  "year": 2016,
+  "drug": "Narsoplimab",
+  "nct": "NCT02682407",
+  "matched_as": "Narsoplimab",
+  "phase": "PHASE2"
+ },
+ "CD3E": {
+  "year": 2021,
+  "drug": "Mosunetuzumab",
+  "nct": "NCT05155345",
+  "matched_as": "Mosunetuzumab",
+  "phase": "PHASE1"
+ },
+ "CD3G": {
+  "year": 2021,
+  "drug": "Mosunetuzumab",
+  "nct": "NCT05155345",
+  "matched_as": "Mosunetuzumab",
+  "phase": "PHASE1"
+ },
+ "CD3D": {
+  "year": 2021,
+  "drug": "Mosunetuzumab",
+  "nct": "NCT05155345",
+  "matched_as": "Mosunetuzumab",
+  "phase": "PHASE1"
+ },
+ "ICOSLG": {
+  "year": 2008,
+  "drug": "Amg-557",
+  "nct": "NCT00774943",
+  "matched_as": "Amg-557",
+  "phase": "PHASE1"
+ },
+ "BCL2": {
+  "year": 2012,
+  "drug": "Venetoclax",
+  "nct": "NCT01686555",
+  "matched_as": "Venetoclax",
+  "phase": "PHASE1"
+ },
+ "FCGRT": {
+  "year": 2021,
+  "drug": "Nipocalimab",
+  "nct": "NCT04882878",
+  "matched_as": "Nipocalimab",
+  "phase": "PHASE2"
+ },
+ "CD22": {
+  "year": 2001,
+  "drug": "Epratuzumab",
+  "nct": "NCT00011908",
+  "matched_as": "Epratuzumab",
+  "phase": "PHASE1"
+ },
+ "S1PR1": {
+  "year": 2014,
+  "drug": "Amiselimod",
+  "nct": "NCT02307643",
+  "matched_as": "Amiselimod",
+  "phase": "PHASE1"
+ },
+ "IL17A": {
+  "year": 2021,
+  "drug": "Vunakizumab",
+  "nct": "NCT04924296",
+  "matched_as": "SHR-1314",
+  "phase": "PHASE2"
+ },
+ "CLEC4C": {
+  "year": 2014,
+  "drug": "Litifilimab",
+  "nct": "NCT02106897",
+  "matched_as": "Litifilimab",
+  "phase": "PHASE1"
+ },
+ "CD19": {
+  "year": 2016,
+  "drug": "Obexelimab",
+  "nct": "NCT02725515",
+  "matched_as": "XmAb5871",
+  "phase": "PHASE2"
+ },
+ "FCGR2B": {
+  "year": 2016,
+  "drug": "Obexelimab",
+  "nct": "NCT02725515",
+  "matched_as": "XmAb5871",
+  "phase": "PHASE2"
+ },
+ "LILRA4": {
+  "year": 2019,
+  "drug": "Daxdilimab",
+  "nct": "NCT03817424",
+  "matched_as": "VIB7734",
+  "phase": "PHASE1"
+ },
+ "HSPA8": {
+  "year": 2010,
+  "drug": "Forigerimod",
+  "nct": "NCT01135459",
+  "matched_as": "Lupuzor",
+  "phase": "PHASE2"
+ },
+ "CD40": {
+  "year": 2001,
+  "drug": "Cd40 Ligand",
+  "nct": "NCT00008749",
+  "matched_as": "Cd40 Ligand",
+  "phase": ""
+ },
+ "CD74": {
+  "year": 2013,
+  "drug": "Milatuzumab",
+  "nct": "NCT01845740",
+  "matched_as": "Milatuzumab",
+  "phase": "PHASE1"
+ },
+ "TLR8": {
+  "year": 2020,
+  "drug": "Afimetoran",
+  "nct": "NCT04493541",
+  "matched_as": "BMS-986256",
+  "phase": "PHASE1"
+ },
+ "CD52": {
+  "year": 2008,
+  "drug": "Alemtuzumab",
+  "nct": "NCT00684255",
+  "matched_as": "Alemtuzumab",
+  "phase": "PHASE1"
+ },
+ "IFNAR1": {
+  "year": 2011,
+  "drug": "Anifrolumab",
+  "nct": "NCT01438489",
+  "matched_as": "Anifrolumab",
+  "phase": "PHASE2"
+ },
+ "S1PR5": {
+  "year": 2014,
+  "drug": "Amiselimod",
+  "nct": "NCT02307643",
+  "matched_as": "Amiselimod",
+  "phase": "PHASE1"
+ },
+ "S1PR2": {
+  "year": 2014,
+  "drug": "Amiselimod",
+  "nct": "NCT02307643",
+  "matched_as": "Amiselimod",
+  "phase": "PHASE1"
+ },
+ "S1PR4": {
+  "year": 2014,
+  "drug": "Amiselimod",
+  "nct": "NCT02307643",
+  "matched_as": "Amiselimod",
+  "phase": "PHASE1"
+ },
+ "S1PR3": {
+  "year": 2014,
+  "drug": "Amiselimod",
+  "nct": "NCT02307643",
+  "matched_as": "Amiselimod",
+  "phase": "PHASE1"
+ },
+ "CD40LG": {
+  "year": 2010,
+  "drug": "Dapirolizumab Pegol",
+  "nct": "NCT01093911",
+  "matched_as": "Dapirolizumab Pegol",
+  "phase": "PHASE1"
+ },
+ "TNF": {
+  "year": 2006,
+  "drug": "Infliximab",
+  "nct": "NCT00368264",
+  "matched_as": "Infliximab",
+  "phase": "PHASE2,PHASE3"
+ },
+ "IL3RA": {
+  "year": 2016,
+  "drug": "Talacotuzumab",
+  "nct": "NCT02920424",
+  "matched_as": "JNJ-56022473",
+  "phase": "PHASE1"
+ }
+}

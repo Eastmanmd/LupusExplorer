@@ -1,0 +1,164 @@
+[
+ {
+  "disease": "autoimmune hepatitis",
+  "auc": 0.9024160060400152,
+  "n_pos": 6,
+  "median_pct": 0.0798650168728909
+ },
+ {
+  "disease": "SYSTEMIC LUPUS ERYTHEMATOSUS",
+  "auc": 0.8100579074605049,
+  "n_pos": 42,
+  "median_pct": 0.15073115860517436
+ },
+ {
+  "disease": "dermatomyositis",
+  "auc": 0.8089203894616266,
+  "n_pos": 16,
+  "median_pct": 0.1124859392575928
+ },
+ {
+  "disease": "giant cell arteritis",
+  "auc": 0.791540404040404,
+  "n_pos": 9,
+  "median_pct": 0.2778402699662542
+ },
+ {
+  "disease": "psoriatic arthritis",
+  "auc": 0.7900391605582889,
+  "n_pos": 23,
+  "median_pct": 0.1361079865016873
+ },
+ {
+  "disease": "Behcet disease",
+  "auc": 0.7660329171396141,
+  "n_pos": 8,
+  "median_pct": 0.22384701912260968
+ },
+ {
+  "disease": "granulomatosis with polyangiitis",
+  "auc": 0.765375854214123,
+  "n_pos": 11,
+  "median_pct": 0.19122609673790777
+ },
+ {
+  "disease": "Sjogren syndrome",
+  "auc": 0.7519267822736031,
+  "n_pos": 24,
+  "median_pct": 0.23622047244094488
+ },
+ {
+  "disease": "juvenile idiopathic arthritis",
+  "auc": 0.7505011454753723,
+  "n_pos": 16,
+  "median_pct": 0.2778402699662542
+ },
+ {
+  "disease": "psoriasis",
+  "auc": 0.7423116615067079,
+  "n_pos": 34,
+  "median_pct": 0.19572553430821146
+ },
+ {
+  "disease": "rheumatoid arthritis",
+  "auc": 0.7287931883344435,
+  "n_pos": 86,
+  "median_pct": 0.21934758155230596
+ },
+ {
+  "disease": "systemic sclerosis",
+  "auc": 0.7250225926297821,
+  "n_pos": 23,
+  "median_pct": 0.1889763779527559
+ },
+ {
+  "disease": "myasthenia gravis",
+  "auc": 0.714123006833713,
+  "n_pos": 11,
+  "median_pct": 0.23622047244094488
+ },
+ {
+  "disease": "ankylosing spondylitis",
+  "auc": 0.7122234214786832,
+  "n_pos": 17,
+  "median_pct": 0.2778402699662542
+ },
+ {
+  "disease": "ulcerative colitis",
+  "auc": 0.7068773579071062,
+  "n_pos": 38,
+  "median_pct": 0.21934758155230596
+ },
+ {
+  "disease": "atopic dermatitis",
+  "auc": 0.7064351851851852,
+  "n_pos": 25,
+  "median_pct": 0.20584926884139482
+ },
+ {
+  "disease": "Crohn disease",
+  "auc": 0.7002597563238295,
+  "n_pos": 38,
+  "median_pct": 0.22384701912260968
+ },
+ {
+  "disease": "IgA nephropathy",
+  "auc": 0.6984744469870328,
+  "n_pos": 15,
+  "median_pct": 0.28346456692913385
+ },
+ {
+  "disease": "autoimmune hemolytic anemia",
+  "auc": 0.6907704042715485,
+  "n_pos": 15,
+  "median_pct": 0.23622047244094488
+ },
+ {
+  "disease": "vitiligo",
+  "auc": 0.6861111111111111,
+  "n_pos": 9,
+  "median_pct": 0.22384701912260968
+ },
+ {
+  "disease": "hidradenitis suppurativa",
+  "auc": 0.684990125082291,
+  "n_pos": 21,
+  "median_pct": 0.22384701912260968
+ },
+ {
+  "disease": "multiple sclerosis",
+  "auc": 0.6570907291731091,
+  "n_pos": 38,
+  "median_pct": 0.32845894263217096
+ },
+ {
+  "disease": "graft versus host disease",
+  "auc": 0.6539386883973612,
+  "n_pos": 30,
+  "median_pct": 0.2778402699662542
+ },
+ {
+  "disease": "sarcoidosis",
+  "auc": 0.639472190692395,
+  "n_pos": 8,
+  "median_pct": 0.29358830146231724
+ },
+ {
+  "disease": "type 1 diabetes",
+  "auc": 0.6320949432404541,
+  "n_pos": 34,
+  "median_pct": 0.32395950506186727
+ },
+ {
+  "disease": "immune thrombocytopenic purpura",
+  "auc": 0.6289189472580476,
+  "n_pos": 22,
+  "median_pct": 0.2508436445444319
+ },
+ {
+  "disease": "antiphospholipid syndrome",
+  "auc": 0.5430839002267573,
+  "n_pos": 7,
+  "median_pct": 0.22384701912260968
+ }
+]

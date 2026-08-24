@@ -1,0 +1,55 @@
+"""Development codes for the candidate drugs.
+
+ClinicalTrials.gov records trials under whatever name the sponsor used at the
+time, so early-phase trials are registered under a development code and later
+ones under the INN. Querying the INN alone dates a programme years too late --
+obexelimab's 2016 SLE trial is registered as XmAb5871 -- which is the same
+synonym problem the PubMed specificity denominator already had to solve.
+"""
+SYNONYMS = {
+    "Obexelimab": ["XmAb5871", "XmAb 5871"],
+    "Litifilimab": ["BIIB059"],
+    "Deucravacitinib": ["BMS-986165"],
+    "Dapirolizumab Pegol": ["CDP7657"],
+    "Iscalimab": ["CFZ533"],
+    "Ianalumab": ["VAY736"],
+    "Cenerimod": ["ACT-334441"],
+    "Daxdilimab": ["VIB7734", "HZN-7734"],
+    "Enpatoran": ["M5049"],
+    "Afimetoran": ["BMS-986256"],
+    "Rozibafusp Alfa": ["AMG 570", "AMG570"],
+    "Anifrolumab": ["MEDI-546"],
+    "Sifalimumab": ["MEDI-545"],
+    "Epratuzumab": ["hLL2"],
+    "Forigerimod": ["Lupuzor", "P140 peptide", "IPP-201101"],
+    "Felzartamab": ["MOR202"],
+    "Mezagitamab": ["TAK-079"],
+    "Obecabtagene Autoleucel": ["obe-cel", "AUTO1"],
+    "Fenebrutinib": ["GDC-0853"],
+    "Elsubrutinib": ["ABBV-105"],
+    "Branebrutinib": ["BMS-986195"],
+    "Orelabrutinib": ["ICP-022"],
+    "Vunakizumab": ["SHR-1314"],
+    "Lanraplenib": ["GS-9876"],
+    "Blisibimod": ["A-623", "AMG 623"],
+    "Tabalumab": ["LY2127399"],
+    "Ustekinumab": ["CNTO 1275"],
+    "Venetoclax": ["ABT-199"],
+    "Nipocalimab": ["M281"],
+    "Evobrutinib": ["M2951"],
+    "Brepocitinib": ["PF-06700841"],
+    "Baricitinib": ["LY3009104", "INCB028050"],
+    "Inebilizumab": ["MEDI-551"],
+    "Tafasitamab": ["MOR208"],
+    "Medi-570": ["MEDI-570", "AMG 557"],
+    "Amg-811": ["AMG 811"],
+    "Nnc0114-0006": ["NNC0114-0006"],
+    "Lulizumab Pegol": ["BMS-931699"],
+    "Amiselimod": ["MT-1303"],
+    "Talacotuzumab": ["CSL362", "JNJ-56022473"],
+    "Milatuzumab": ["hLL1", "IMMU-115"],
+    "Rontalizumab": ["rhuMAb Interferon-alpha"],
+    "Pacibekitug": ["TZLS-501", "HS-628"],
+    "Apg-2575": ["APG-2575", "lisaftoclax"],
+    "Msc-2364447": ["MSC2364447"],
+}
