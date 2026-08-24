@@ -3,3 +3,8 @@ cache/
 __pycache__/
 *.pyc
 .DS_Store
+analysis/manuscript_draft.html
+analysis/
+analysis/out/gene2pubmed.gz
+analysis/out/g2p_subset.tsv
+analysis/out/fetch_cross.log
