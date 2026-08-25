@@ -242,6 +242,11 @@ tr.gene-row:hover td, tr.gene-row:focus-within td { background: var(--wash); }
 .gridline { stroke: var(--grid); stroke-width: 1; }
 .baseline-rule { stroke: var(--baseline); stroke-width: 1; }
 .crosshair { stroke: var(--baseline); stroke-width: 1; }
+/* The calendar year still in progress: shaded, with the series drawn dashed
+   across it, so a partial count is never read as a fall in interest. */
+.partial-band { fill: var(--grid); opacity: 0.4; }
+.partial-note { fill: var(--muted); font-size: 10px; }
+.hover-dot { pointer-events: none; }
 
 .tooltip {
   position: fixed; z-index: 50; pointer-events: none;

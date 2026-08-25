@@ -14,6 +14,8 @@ const state = {
   compare: [],          // symbols, max 3
   pathwaySource: "all",
   compareAsTable: false,
+  compareRange: 20,     // years shown on the trend chart, or "all"
+  compareMode: "count", // "count" = papers/year, "share" = % of that year's corpus
   targets: [],          // drug-target opportunity scores, one per ranked gene
   targetMeta: null,     // pillar + criterion definitions shipped with the data
   targetWeights: null,  // {evidence, tractability, safety, opportunity}
@@ -212,7 +214,14 @@ function niceTicks(max, count = 4) {
   const candidates = [step, 2 * step, 2.5 * step, 5 * step, 10 * step];
   const chosen = candidates.find(s => max / s <= count) || 10 * step;
   const ticks = [];
-  for (let v = 0; v <= max + 1e-9; v += chosen) ticks.push(Math.round(v * 100) / 100);
+  // The axis must reach the data. Stopping at `max` can leave the top tick
+  // BELOW it — 68 with a step of 20 yields 0/20/40/60 — and anything above the
+  // last tick is then plotted above the plot area, taking its end label out of
+  // the viewBox with it. Always emit one tick at or past the maximum.
+  for (let v = 0; ; v += chosen) {
+    ticks.push(Math.round(v * 100) / 100);
+    if (v >= max - 1e-9) break;
+  }
   return ticks;
 }
 
@@ -264,27 +273,74 @@ function yearColumnChart(yearCounts, { label }) {
 }
 
 /* Multi-series line chart with crosshair + all-series tooltip. */
-function trendLineChart(seriesList) {
-  const start = Math.min(...seriesList.map(s => {
-    const ys = Object.keys(s.yearCounts).map(Number);
-    return ys.length ? Math.min(...ys) : state.meta.max_year;
-  }), state.meta.max_year - 9);
+/* Year range shared by the trend chart and its data table, so "Show data
+   table" always describes exactly what is plotted.
+
+   The window is FIXED by default rather than derived from the selected genes.
+   Deriving it meant that adding one early-published gene (CRP, first lupus
+   mention 1965) rewrote the axis for every series already on the plot and
+   squeezed the recent decades into a corner — the shape of a line changed
+   without its data changing. */
+function compareYears(seriesList, range) {
   const end = state.meta.max_year;
+  let start;
+  if (range === "all") {
+    const firsts = seriesList.flatMap(s => Object.keys(s.yearCounts).map(Number));
+    start = Math.max(1950, Math.min(...(firsts.length ? firsts : [end]), end - 9));
+  } else {
+    start = end - range + 1;
+  }
   const years = [];
-  for (let y = Math.max(start, 1975); y <= end; y++) years.push(y);
-  const W = 900, H = 280, padL = 40, padR = 70, padT = 12, padB = 26;
+  for (let y = start; y <= end; y++) years.push(y);
+  return years;
+}
+
+/* The last calendar year that has actually finished. The year in progress is
+   only partly published, so its counts are not comparable with the years
+   before it and are drawn dashed rather than solid. */
+function completeYear() {
+  const end = state.meta.max_year;
+  return Math.min(state.meta.complete_year ?? end, end);
+}
+
+/* Papers in a year, or that gene's share of all lupus papers published that
+   year. The corpus tripled between 2000 and 2025, so on raw counts a flat
+   line is a gene quietly losing ground; share mode takes that growth out. */
+function compareValue(series, year, mode) {
+  const n = series.yearCounts[year] || 0;
+  if (mode !== "share") return n;
+  const corpus = (state.meta.corpus_year_counts || {})[year] || 0;
+  return corpus ? (n / corpus) * 100 : 0;
+}
+
+function compareValueLabel(v, mode) {
+  if (mode !== "share") return fmt(v);
+  return `${v < 1 ? v.toFixed(2) : v.toFixed(1)}%`;
+}
+
+function trendLineChart(seriesList, { mode = "count", range = 20 } = {}) {
+  const years = compareYears(seriesList, range);
+  const end = years.at(-1);
+  const complete = completeYear();
+  const hasPartial = end > complete && years.includes(complete);
+  const W = 900, H = 280, padL = 46, padR = 84, padT = 12, padB = 26;
   const plotW = W - padL - padR, plotH = H - padT - padB;
-  const maxV = Math.max(1, ...seriesList.flatMap(s => years.map(y => s.yearCounts[y] || 0)));
+  const valueOf = (s, y) => compareValue(s, y, mode);
+  const maxV = Math.max(mode === "share" ? 0.01 : 1,
+    ...seriesList.flatMap(s => years.map(y => valueOf(s, y))));
   const ticks = niceTicks(maxV);
   const yMax = ticks.at(-1);
   const px = i => padL + (years.length === 1 ? plotW / 2 : (i * plotW) / (years.length - 1));
+  const xOf = y => px(y - years[0]);
   const py = v => padT + plotH - (v / yMax) * plotH;
 
   const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img",
-    "aria-label": `Papers per year for ${seriesList.map(s => s.name).join(", ")}` });
+    "aria-label": `${mode === "share" ? "Share of lupus papers" : "Papers"} per year, ` +
+      `${years[0]} to ${end}, for ${seriesList.map(s => s.name).join(", ")}` });
   for (const t of ticks) {
     if (t > 0) svg.append(svgEl("line", { class: "gridline", x1: padL, x2: W - padR, y1: py(t), y2: py(t) }));
-    svg.append(svgEl("text", { class: "tick-label", x: padL - 6, y: py(t) + 3.5, "text-anchor": "end" }, fmt(t)));
+    svg.append(svgEl("text", { class: "tick-label", x: padL - 6, y: py(t) + 3.5, "text-anchor": "end" },
+      mode === "share" ? `${t}%` : fmt(t)));
   }
   svg.append(svgEl("line", { class: "baseline-rule", x1: padL, x2: W - padR, y1: py(0), y2: py(0) }));
   const labelEvery = Math.ceil(years.length / 12);
@@ -293,43 +349,87 @@ function trendLineChart(seriesList) {
       svg.append(svgEl("text", { class: "tick-label", x: px(i), y: H - 8, "text-anchor": "middle" }, y));
     }
   });
+  // Shade the incomplete year so the dashed tail has an obvious cause.
+  if (hasPartial) {
+    svg.append(svgEl("rect", { class: "partial-band", x: xOf(complete), y: padT,
+      width: Math.max(2, xOf(end) - xOf(complete)), height: plotH }));
+    const nx = (xOf(complete) + xOf(end)) / 2;
+    svg.append(svgEl("text", { class: "tick-label partial-note", x: nx, y: padT + plotH - 6,
+      "text-anchor": "start",
+      transform: `rotate(-90 ${nx} ${padT + plotH - 6})` }, `${end} partial`));
+  }
+
+  const solid = years.filter(y => y <= complete);
+  const tail = years.filter(y => y >= complete);
+  const pathFor = (s, ys) => ys.map((y, i) =>
+    `${i ? "L" : "M"}${xOf(y).toFixed(1)},${py(valueOf(s, y)).toFixed(1)}`).join("");
+
   seriesList.forEach((s, si) => {
     const color = `var(${SERIES_VARS[si]})`;
-    const d = years.map((y, i) => `${i ? "L" : "M"}${px(i).toFixed(1)},${py(s.yearCounts[y] || 0).toFixed(1)}`).join("");
-    svg.append(svgEl("path", { d, fill: "none", stroke: color, "stroke-width": 2,
-      "stroke-linejoin": "round", "stroke-linecap": "round" }));
-    const lastY = py(s.yearCounts[end] || 0);
-    svg.append(svgEl("circle", { cx: px(years.length - 1), cy: lastY, r: 4, fill: color,
+    if (solid.length > 1) {
+      svg.append(svgEl("path", { d: pathFor(s, solid), fill: "none", stroke: color,
+        "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    }
+    if (hasPartial && tail.length > 1) {
+      svg.append(svgEl("path", { d: pathFor(s, tail), fill: "none", stroke: color,
+        "stroke-width": 2, "stroke-dasharray": "3 4", opacity: 0.5, "stroke-linecap": "round" }));
+    }
+    // Marker and label sit on the last COMPLETE year — anchoring them to a
+    // partial count made every gene look like it was falling off a cliff.
+    const markX = xOf(hasPartial ? complete : end);
+    const markY = py(valueOf(s, hasPartial ? complete : end));
+    svg.append(svgEl("circle", { cx: markX, cy: markY, r: 4, fill: color,
       stroke: "var(--surface)", "stroke-width": 2 }));
-    const lbl = svgEl("text", { class: "direct-label", x: px(years.length - 1) + 9, y: lastY + 4 }, s.name);
-    svg.append(lbl);
+    svg.append(svgEl("text", { class: "direct-label", x: W - padR + 9, y: markY + 4 }, s.name));
   });
-  // de-collide end labels
+  // De-collide end labels, then keep the whole stack inside the plot area.
   const labels = [...svg.querySelectorAll(".direct-label")]
     .sort((a, b) => +a.getAttribute("y") - +b.getAttribute("y"));
   for (let i = 1; i < labels.length; i++) {
     const prev = +labels[i - 1].getAttribute("y"), cur = +labels[i].getAttribute("y");
     if (cur - prev < 13) labels[i].setAttribute("y", prev + 13);
   }
+  const overflow = labels.length ? +labels.at(-1).getAttribute("y") - (padT + plotH) : 0;
+  if (overflow > 0) {
+    for (const l of labels) l.setAttribute("y", +l.getAttribute("y") - overflow);
+  }
+  for (const l of labels) {
+    l.setAttribute("y", Math.min(padT + plotH, Math.max(padT + 8, +l.getAttribute("y"))));
+  }
 
   const crosshair = svgEl("line", { class: "crosshair", y1: padT, y2: padT + plotH, visibility: "hidden" });
   svg.append(crosshair);
+  const dots = seriesList.map((s, si) => {
+    const d = svgEl("circle", { class: "hover-dot", r: 3.5, visibility: "hidden",
+      fill: `var(${SERIES_VARS[si]})`, stroke: "var(--surface)", "stroke-width": 1.5 });
+    svg.append(d);
+    return d;
+  });
   const hit = svgEl("rect", { x: padL, y: padT, width: plotW, height: plotH + padB, fill: "transparent" });
   hit.addEventListener("pointermove", ev => {
     const rect = svg.getBoundingClientRect();
     const sx = ((ev.clientX - rect.left) / rect.width) * W;
     const i = Math.max(0, Math.min(years.length - 1,
       Math.round(((sx - padL) / plotW) * (years.length - 1))));
+    const year = years[i];
     crosshair.setAttribute("x1", px(i));
     crosshair.setAttribute("x2", px(i));
     crosshair.setAttribute("visibility", "visible");
-    showTooltip(ev.clientX, ev.clientY, String(years[i]),
+    seriesList.forEach((s, si) => {
+      dots[si].setAttribute("cx", px(i));
+      dots[si].setAttribute("cy", py(valueOf(s, year)));
+      dots[si].setAttribute("visibility", "visible");
+    });
+    showTooltip(ev.clientX, ev.clientY,
+      year > complete ? `${year} (partial year)` : String(year),
       seriesList.map((s, si) => ({
-        value: fmt(s.yearCounts[years[i]] || 0), label: s.name, color: `var(${SERIES_VARS[si]})`,
+        value: compareValueLabel(valueOf(s, year), mode),
+        label: s.name, color: `var(${SERIES_VARS[si]})`,
       })));
   });
   hit.addEventListener("pointerleave", () => {
     crosshair.setAttribute("visibility", "hidden");
+    for (const d of dots) d.setAttribute("visibility", "hidden");
     hideTooltip();
   });
   svg.append(hit);
@@ -890,6 +990,21 @@ function renderCompareView() {
     el("button", { "aria-label": `Remove ${sym}`,
       onclick: () => { state.compare = state.compare.filter(s => s !== sym); renderCompareView(); } }, "✕")));
 
+  const picker = (label, value, options, onpick) => el("select", { "aria-label": label,
+      onchange: e => { onpick(e.target.value); renderCompareView(); } },
+    ...options.map(([v, text]) => {
+      const o = el("option", { value: v }, text);
+      if (String(value) === v) o.selected = true;
+      return o;
+    }));
+  const rangeSelect = picker("Year range", state.compareRange,
+    [["10", "Last 10 years"], ["20", "Last 20 years"], ["30", "Last 30 years"], ["all", "All years"]],
+    v => { state.compareRange = v === "all" ? "all" : Number(v); });
+  const modeSelect = picker("Vertical axis", state.compareMode,
+    [["count", "Papers per year"], ["share", "Share of lupus papers"]],
+    v => { state.compareMode = v; });
+
+  const opts = { mode: state.compareMode, range: state.compareRange };
   const seriesList = state.compare.map(sym => ({
     name: sym, yearCounts: state.geneBySymbol.get(sym).year_counts,
   }));
@@ -899,36 +1014,54 @@ function renderCompareView() {
     body.push(
       el("div", { class: "legend" }, ...state.compare.map((sym, i) =>
         el("span", {}, el("span", { class: "key", style: `border-top-color:var(${SERIES_VARS[i]})` }), sym))),
-      trendLineChart(seriesList),
+      trendLineChart(seriesList, opts),
       el("button", { class: "table-toggle",
         onclick: () => { state.compareAsTable = !state.compareAsTable; renderCompareView(); } },
         state.compareAsTable ? "Hide data table" : "Show data table"),
     );
-    if (state.compareAsTable) body.push(compareTable(seriesList));
+    if (state.compareAsTable) body.push(compareTable(seriesList, opts));
   } else {
     body.push(el("p", { class: "muted" }, "Add genes above to compare their publication trends."));
   }
 
+  const partial = state.meta.max_year > completeYear();
   view.replaceChildren(
     el("div", { class: "compare-picker" }, ...chips, input, datalist),
     el("div", { class: "card" },
-      el("h2", {}, "Lupus papers per year"),
-      el("p", { class: "sub" }, "Publication trend comparison across the lupus corpus (PubTator 3 gene mentions)."),
+      el("h2", {}, state.compareMode === "share"
+        ? "Share of lupus papers per year" : "Lupus papers per year"),
+      el("p", { class: "sub" },
+        state.compareMode === "share"
+          ? "Each gene as a percentage of all lupus papers published that year. The corpus " +
+            "roughly tripled between 2000 and 2025, so on raw counts a flat line is a gene " +
+            "losing ground — this view takes that growth out."
+          : "Publication trend comparison across the lupus corpus (PubTator 3 gene mentions)."),
+      el("div", { class: "filter-row" }, rangeSelect, modeSelect,
+        partial
+          ? el("span", { class: "count" },
+              `${state.meta.max_year} is still in progress — drawn dashed, and excluded ` +
+              "from the trend statistics")
+          : null),
       ...body),
   );
 }
 
-function compareTable(seriesList) {
-  const end = state.meta.max_year;
-  const years = [];
-  for (let y = end - 19; y <= end; y++) years.push(y);
-  return el("table", { class: "data" },
+function compareTable(seriesList, { mode = "count", range = 20 } = {}) {
+  const years = [...compareYears(seriesList, range)].reverse();
+  const complete = completeYear();
+  const table = el("table", { class: "data" },
     el("thead", {}, el("tr", {},
       el("th", {}, "Year"),
       ...seriesList.map(s => el("th", { class: "num" }, s.name)))),
     el("tbody", {}, ...years.map(y => el("tr", {},
-      el("td", { class: "muted num" }, String(y)),
-      ...seriesList.map(s => el("td", { class: "num" }, fmt(s.yearCounts[y] || 0)))))));
+      el("td", { class: "muted num" }, y > complete ? `${y} *` : String(y)),
+      ...seriesList.map(s => el("td", { class: "num" },
+        compareValueLabel(compareValue(s, y, mode), mode)))))));
+  return years[0] > complete
+    ? el("div", {}, table,
+        el("p", { class: "sub" }, `* ${years[0]} is still in progress, so its counts are ` +
+          "not comparable with the full years above it."))
+    : table;
 }
 
 /* ---------- about ---------- */
