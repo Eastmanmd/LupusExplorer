@@ -108,12 +108,21 @@ def main():
     articles, gene_articles = load_mentions()
     years = [a["year"] for a in articles.values() if a["year"]]
     # Publishers pre-date some epub articles a year or two ahead; clamp so the
-    # recency window and chart axes end at the actual current year.
-    max_year = min(max(years), datetime.date.today().year)
-    recent_cutoff = max_year - config.RECENT_YEARS + 1
-    corpus_recent_share = sum(1 for y in years if y >= recent_cutoff) / len(years)
+    # chart axes end at the actual current year.
+    today = datetime.date.today()
+    max_year = min(max(years), today.year)
+    # Windowed statistics have to compare equal spans of time. The current
+    # calendar year is only partly elapsed, so counting it as "recent" divides
+    # a short window by a full one and understates every gene's velocity —
+    # enough to push genes across the surging/declining thresholds. Charts
+    # still plot through max_year; the statistics stop at the last year that
+    # actually finished.
+    complete_year = max_year - 1 if max_year >= today.year else max_year
+    recent_cutoff = complete_year - config.RECENT_YEARS + 1
+    corpus_recent_share = sum(1 for y in years
+                              if recent_cutoff <= y <= complete_year) / len(years)
     print(f"{len(articles)} articles, {len(gene_articles)} distinct gene ids, "
-          f"years up to {max_year}")
+          f"years up to {max_year} (statistics through {complete_year})")
 
     candidates = {g: p for g, p in gene_articles.items()
                   if len(p) >= config.MIN_PAPERS_FOR_CANDIDATE}
@@ -158,9 +167,11 @@ def main():
             if y:
                 year_counts[y] += 1
         total = len(pmid_set)
-        recent = sum(c for y, c in year_counts.items() if y >= recent_cutoff)
+        recent = sum(c for y, c in year_counts.items()
+                     if recent_cutoff <= y <= complete_year)
         # Velocity: share of papers in the last 5 years vs the 5 years before.
         # >1 means attention is accelerating, <1 means the gene is past its peak.
+        # Both windows end on a completed year so the ratio is like-for-like.
         prior_start = recent_cutoff - config.RECENT_YEARS
         prior = sum(c for y, c in year_counts.items()
                     if prior_start <= y < recent_cutoff)
@@ -272,6 +283,7 @@ def main():
             "genes_ranked": len(genes),
             "genes_shown": len(top),
             "max_year": max_year,
+            "complete_year": complete_year,
             "recent_cutoff": recent_cutoff,
             "weights": config.SCORE_WEIGHTS,
         }, f)

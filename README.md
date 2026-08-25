@@ -188,10 +188,15 @@ peak year, so you can see at a glance whether a gene is climbing or past its
 prime. Beneath it, a **velocity** tag classifies the shape by comparing the
 last 5 years against the 5 before:
 
-- **▲ surging** (≥ 1.5×) — TYK2 is 2.7×, CD19 is 3.0×
-- **steady** (0.7–1.5×)
-- **▼ declining** (≤ 0.7×) — PTPN22 is 0.43× and peaked in 2005; STAT4 is
-  0.70× and peaked in 2010
+- **▲ surging** (≥ 1.5×) — TYK2 is 3.7×, CD19 is 2.6×
+- **steady** (0.7–1.5×) — STAT4 is 0.97× but peaked back in 2010
+- **▼ declining** (≤ 0.7×) — PTPN22 is 0.53× and peaked in 2005
+
+Both windows end on the last **completed** calendar year, not the current one.
+The year in progress is only partly published, so counting it as "recent"
+would divide a short window by a full one and understate every gene's
+velocity — enough to push genes across these thresholds. Charts still plot
+through the current year; only the statistics stop at `complete_year`.
 
 This is what separates the GWAS-era classics from today's hot targets: PTPN22
 and STAT4 have far more total papers than TYK2, but the field has moved on.
