@@ -776,25 +776,62 @@ function renderPathwaysView() {
   const sources = ["all", "GO:BP", "KEGG", "REAC"];
   const select = el("select", { onchange: e => { state.pathwaySource = e.target.value; renderPathwaysView(); } },
     ...sources.map(s => {
-      const o = el("option", { value: s }, s === "all" ? "All sources" : SOURCE_LABELS[s]);
+      const o = el("option", { value: s }, s === "all" ? "Top 10 per source" : SOURCE_LABELS[s]);
       if (s === state.pathwaySource) o.selected = true;
       return o;
     }));
+  const legend = el("div", { class: "legend" },
+    ...Object.entries(SOURCE_LABELS).map(([s, label]) =>
+      el("span", {}, el("span", { class: "swatch", style: `background:${SOURCE_COLORS[s]}` }), label)));
+
+  // "All sources" gives each method its own panel of 10 rather than one merged
+  // list, because a single list is dominated by GO:BP — its broadest terms sit
+  // ~100 orders of magnitude below KEGG's best, so KEGG and Reactome would be
+  // squeezed off the bottom of a shared ranking and a shared bar scale alike.
+  if (state.pathwaySource === "all") {
+    const panels = sources.slice(1).map(src => {
+      const shown = state.pathways
+        .filter(t => t.source === src)
+        .sort((a, b) => a.p_value - b.p_value)
+        .slice(0, 10);
+      if (!shown.length) return null;
+      const maxLog = Math.max(...shown.map(t => -Math.log10(t.p_value)));
+      return el("div", { class: "card" },
+        el("div", { class: "pillar-head" },
+          el("h2", {},
+            el("span", { class: "swatch", style: `background:${SOURCE_COLORS[src]}` }),
+            SOURCE_LABELS[src]),
+          el("span", { class: "muted" }, `top 10 of ${state.pathways.filter(t => t.source === src).length}`)),
+        ...shown.map(t => pathwayRow(t, maxLog)));
+    }).filter(Boolean);
+
+    view.replaceChildren(
+      el("div", { class: "filter-row" }, select,
+        el("span", { class: "count" }, `${panels.length} sources · 10 terms each`)),
+      el("div", { class: "card" },
+        el("h2", {}, "Enriched pathways in the top lupus genes"),
+        el("p", { class: "sub" },
+          "The ten most significant terms from each method, scored by g:Profiler over the " +
+          "top-ranked genes. Bars are scaled within their own panel, so lengths compare " +
+          "between terms from the same source — not across sources. Pick a single source " +
+          "above to see its full list. Click a term to see its genes.")),
+      ...panels);
+    return;
+  }
+
   const shown = state.pathways
-    .filter(t => state.pathwaySource === "all" || t.source === state.pathwaySource)
+    .filter(t => t.source === state.pathwaySource)
     .sort((a, b) => a.p_value - b.p_value)
-    .slice(0, state.pathwaySource === "all" ? 45 : 40);
+    .slice(0, 40);
   const maxLog = Math.max(...shown.map(t => -Math.log10(t.p_value)));
 
   view.replaceChildren(
     el("div", { class: "filter-row" }, select,
       el("span", { class: "count" }, `${shown.length} terms`)),
-    el("div", { class: "legend" },
-      ...Object.entries(SOURCE_LABELS).map(([s, label]) =>
-        el("span", {}, el("span", { class: "swatch", style: `background:${SOURCE_COLORS[s]}` }), label))),
+    legend,
     el("div", { class: "card" },
-      el("h2", {}, "Enriched pathways in the top lupus genes"),
-      el("p", { class: "sub" }, "Bar length = −log₁₀(adjusted p) from g:Profiler over the top-ranked genes. Click a term to see its genes."),
+      el("h2", {}, `Enriched ${SOURCE_LABELS[state.pathwaySource]} terms`),
+      el("p", { class: "sub" }, "Bar length = \u2212log\u2081\u2080(adjusted p) from g:Profiler over the top-ranked genes. Click a term to see its genes."),
       ...shown.map(t => pathwayRow(t, maxLog))),
   );
 }
