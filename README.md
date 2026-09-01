@@ -8,9 +8,9 @@ A dashboard that tracks which genes the systemic lupus erythematosus (SLE)
 research literature is actually talking about. It ranks genes by a combined
 literature + evidence score, shows publication trends over time, maps the top
 genes onto biological pathways (GO-BP, KEGG, Reactome), surfaces the genes the
-field has only just started publishing on, and links every gene to the PubMed
-articles that mention it. Data refreshes weekly from PubMed, PubTator 3,
-Open Targets, and g:Profiler.
+field has only just started publishing on, maps which genes get written about
+together, and links every gene to the PubMed articles that mention it. Data
+refreshes weekly from PubMed, PubTator 3, Open Targets, and g:Profiler.
 
 ## The combined score
 
@@ -142,6 +142,158 @@ ratio outside 0.25–8 flags the gene as **check mentions** — 24 genes today,
 including PIK3CA/PIK3CB, whose recent "mentions" are mostly generic PI3K
 signalling papers. Flagged genes stay in the table and are drawn faded in the
 scatter rather than being silently dropped.
+
+## The co-mention network
+
+Two genes are joined on this map because papers mention them together. That is
+the whole of it: **every edge, weight and module comes from the mention data and
+nothing else** — no interaction database, no pathway membership, no Open Targets.
+
+That purity extends to who appears. The node set is the **300 genes with the
+most lupus papers** (49 or more), *not* the leaderboard's top 300, because the
+leaderboard score is 30% Open Targets and would have let a curated database pick
+the cast of a map billed as pure co-mention. The two sets differ by 52 genes:
+CR1 (168 papers) and FCGR3B are on this map and not the leaderboard; FAM167A and
+CRBN are on the leaderboard and not here.
+
+### Two statistics, again
+
+Raw co-mention count is what gets **displayed** — it is the honest, legible
+number. It is a bad way to **choose** edges, because the most-published genes
+co-occur constantly whatever the biology: IL6 and TNF share 754 papers, second
+heaviest in the corpus, and it means nothing. So each pair is:
+
+- **gated** on a hypergeometric tail probability at p < 10⁻⁶ (roughly Bonferroni
+  over 45k possible pairs) — *is this more overlap than chance?*
+- **selected and ranked** on normalized pointwise mutual information — *how much
+  more?* npmi is bounded in −1…1 and its denominator discounts rare pairs, so it
+  neither rewards fame like the raw count nor blows up on a 4-of-4 coincidence
+  like a bare lift ratio.
+
+Same split as the Emerging tab: significance decides membership, effect size
+decides rank.
+
+### Why the threshold you'd reach for first is the wrong one
+
+Sweeping a global minimum co-mention count:
+
+| Threshold | Edges | Genes | Density |
+|---|---|---|---|
+| ≥5 | 3,167 | 294 | 0.074 |
+| ≥10 | 1,568 | 267 | 0.044 |
+| ≥20 | 730 | 209 | 0.034 |
+| ≥50 | 220 | 103 | 0.042 |
+
+Density stops falling around ≥15 and then rises. Past that point a global
+threshold deletes *genes*, not clutter — a third of the map for no readability.
+So each gene instead keeps its **strongest k partners** and the union is the
+graph: every gene stays, no hub swallows the picture, and k is one slider
+(shipped at 6, adjustable down to 1 in the browser). At k=6 that is **927 edges
+over 287 genes**; 13 have no partner clearing the gate and are listed separately.
+
+### Modules
+
+Communities come from **Louvain modularity optimisation** over those edges.
+Label propagation was tried first and fragmented — 41 communities, 146 genes in
+communities of seven or fewer — which leaves a map that is mostly grey. Louvain
+gives 13, eleven of them ten genes or larger:
+
+| Module | Genes | Named |
+|---|---|---|
+| apoptotic signaling | 47 | vs the map |
+| chemokine receptors bind chemokines | 34 | vs the map |
+| cell adhesion molecule interaction | 33 | vs the map |
+| JAK-STAT receptor signaling | 30 | vs the map |
+| regulation of lymphocyte activation | 30 | vs the genome |
+| initial triggering of complement | 27 | vs the map |
+| negative regulation of coagulation | 24 | vs the map |
+| toll-like receptor signaling | 16 | vs the map |
+| immune receptor signaling (Fcγ receptors) | 16 | vs the genome |
+| response to exogenous dsRNA | 16 | vs the map |
+| mRNA splicing | 10 | vs the map |
+| ACE, REN | 2 | *no term fits* |
+| TG, TPO | 2 | *no term fits* |
+
+The names come from g:Profiler in one multi-query request — **annotation laid
+over structure co-mention had already produced, never an input to it.** The
+background is the map's own 300 genes, not the genome: against a genome
+background every module in a lupus gene set enriches for "immune system process"
+and the labels say nothing, whereas against the other 299 a module is only named
+for what makes it *different from the rest of the board*. A second pass against
+the genome supplies a fallback for modules that clear no bar in the first, and
+which scope produced a name is shown.
+
+Two filters keep the captions honest. KEGG's `05xxx` (Human Diseases) and
+`01xxx` (global maps, antineoplastic drug resistance) blocks are dropped — a
+module of MAPK and AKT genes otherwise comes back captioned "Breast cancer" —
+and Reactome's disease branch is dropped by name, which is what turned "MyD88
+deficiency (TLR2/4)" into "toll-like receptor signaling pathway". And among a
+module's surviving terms the caption is the **most specific** term that still
+covers half the module, not the smallest p-value, because p-value ordering
+rewards enormous parent terms.
+
+The two unnamed modules are the interesting ones. ACE/REN and TG/TPO are
+genuinely tight pairs that no ontology term describes, because what they share
+is a clinical assay, not a pathway.
+
+### Layout
+
+A seeded spring-and-charge layout, computed in the pipeline and shipped as
+coordinates, so the map is identical for every visitor and can be learned. The
+browser only draws it. Textbook Fruchterman-Reingold was tried and folds all 287
+nodes into one corner — its `d²/k` attraction overwhelms the repulsion in the
+first few steps — so edges are rest-length springs, which stop pulling once
+satisfied. A weak pull toward each module's centre of mass is layered on top:
+without it the peripheral modules come out coherent but the immune core does
+not, since those modules genuinely interconnect, and the colours stop meaning
+anything. Proximity on the map therefore reflects module membership as well as
+co-mention, which is what the captions claim it does.
+
+### Reading it
+
+Dot size is lupus papers, colour is module, a dark ring means an SLE drug or
+trial candidate exists against that gene. Hovering isolates a neighbourhood;
+clicking opens the full ego network with per-partner co-mention counts, npmi,
+and what fraction of the overlap is recent. Edges can be recoloured by age —
+CD27–ITGAX and ITGAX–TBX21 (the age-associated B-cell story) are 76% and 69%
+recent against a 26% baseline, while CD28–FOXP3 and CD40LG–CTLA4 are 0%.
+
+### Genes too small for the map
+
+709 genes below the 49-paper cutoff still have co-mentions with genes that are
+on it, and get an **ego view** even though they never appear in the picture.
+This is where the tab meets the Emerging one:
+
+```
+NELL1    PLA2R1(17), NCAM1(5)
+EXT1     PLA2R1(13), NCAM1(6), C1QA(3)
+SEMA3B   PLA2R1(8),  NCAM1(6)
+THSD7A   PLA2R1(23), NCAM1(4)
+GSDMD    CASP1(9), NLRP3(9), IL1B(6), IL18(4)
+```
+
+The Emerging tab finds NELL1, EXT1, SEMA3B and THSD7A independently, by
+recency alone. The network says *why they arrived together*: all four sit next
+to PLA2R1, the original membranous-nephropathy antigen. Every emerging gene with
+a co-mention footprint links straight through to this view.
+
+The absences are informative too. SLC5A2 and GLP1R top the emerging list and
+have **no** qualifying co-mention — best partner, two shared papers. They came
+into lupus from cardiometabolic medicine rather than from inside lupus
+immunology, and an empty neighbourhood says exactly that.
+
+### Co-mention is not interaction
+
+TG and TPO sit together because both are on a thyroid antibody panel. BLK and
+FAM167A share a linkage block, not a mechanism. This is a map of how the
+*literature* groups genes — part biology, part assay panel, part GWAS locus.
+That is what makes it worth having next to the curated Pathways tab, and the
+disagreements between the two are the point.
+
+`config.ALIAS_COLLISIONS` applies here as well as to the Emerging tab. Left in,
+**CD19–NR1I3 is the single newest strong edge on the whole map** — 33
+co-mentions, 88% of them recent — and it is entirely an artefact of PubTator
+resolving "CAR" in CAR-T papers onto the constitutive androstane receptor.
 
 ## Finding a drug target
 

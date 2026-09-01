@@ -47,10 +47,7 @@ import os
 from collections import defaultdict
 
 import config
-from build_data import fetch_gene_info, load_mentions
-
-HUMAN_TAXID = 9606
-MERGE_TAXIDS = {9606, 10090, 10116}  # human, mouse, rat: merge homologs by symbol
+from build_data import fetch_gene_info, load_mentions, merge_homologs
 
 QUADRANTS = {
     # (mature elsewhere, novel to lupus) -> id, label, blurb
@@ -129,16 +126,7 @@ def main():
                   if len(p) >= config.MIN_PAPERS_FOR_CANDIDATE}
     info = fetch_gene_info(sorted(candidates))
 
-    groups = {}
-    for gid, pmids in candidates.items():
-        gi = info.get(gid) or {}
-        symbol, taxid = gi.get("symbol"), gi.get("taxid")
-        if not symbol or taxid not in MERGE_TAXIDS:
-            continue
-        group = groups.setdefault(symbol.upper(), {"pmids": set(), "human": None})
-        group["pmids"].update(pmids)
-        if taxid == HUMAN_TAXID and group["human"] is None:
-            group["human"] = gid
+    groups = merge_homologs(candidates, info)
 
     with open(config.OPENTARGETS_FILE) as f:
         opentargets = json.load(f)
@@ -159,8 +147,6 @@ def main():
     ln_threshold = math.log(config.EMERGING_P_THRESHOLD)
     genes, excluded = [], []
     for symbol, group in groups.items():
-        if group["human"] is None:
-            continue
         # Charts plot every year; the statistics stop at the last finished one,
         # so `papers` is deliberately not the sum of `year_counts`.
         year_counts = defaultdict(int)

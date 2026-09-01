@@ -50,6 +50,28 @@ EMERGING_NOVELTY_SPLIT = 0.75   # share of lupus papers inside the recent window
 # outside this range means the two counts disagree — see build_emerging.py.
 EMERGING_CORROBORATION_RANGE = (0.25, 8.0)
 
+# --- Co-mention network ------------------------------------------------------
+# Built from cache/mentions.jsonl and nothing else: every edge, weight and
+# module comes from which genes PubTator found in the same abstract. The node
+# set is deliberately the top N by *lupus paper count* rather than by the
+# leaderboard's combined score, because that score is 30% Open Targets — a
+# network billed as pure co-mention should not have its membership decided by
+# a curated database. (The two sets differ by 52 of 300 genes.)
+NETWORK_NODES = 300            # genes on the map, by lupus paper count
+NETWORK_MAX_PAPER_GENES = 15   # skip broad surveys: one 45-gene paper is 990 pairs
+NETWORK_MIN_CO = 4             # a pair needs this many co-mentions to be considered
+NETWORK_P_THRESHOLD = 1e-6     # hypergeometric tail, ~Bonferroni over ~45k pairs
+NETWORK_EDGES_PER_NODE = 6     # backbone: strongest k edges per gene, unioned
+NETWORK_EGO_MIN_CO = 3         # off-map genes need this per partner for an ego view
+NETWORK_EGO_MIN_PARTNERS = 1   # one strong partner is worth more than three weak
+                               # ones: NELL1 shares 17 papers with PLA2R1 and
+                               # almost nothing else, which is the whole story
+NETWORK_MIN_COLOURED_SIZE = 10 # smaller modules render grey rather than
+                               # spending a legend row on two genes
+NETWORK_PALETTE_SIZE = 11      # colours available; modules beyond this go grey
+NETWORK_LAYOUT_SEED = 7
+NETWORK_LAYOUT_ITERATIONS = 250
+
 # PubTator resolves synonyms, so a gene whose alias is also a trending acronym
 # inherits that acronym's papers. In the long tail a single collision is enough
 # to manufacture a top-ranked "emerging gene". These were confirmed by reading
@@ -122,3 +144,5 @@ TARGET_PROFILE_FILE = os.path.join(CACHE_DIR, "target_profile.json")
 CROSS_DRUGS_FILE = os.path.join(CACHE_DIR, "cross_drugs.json")
 SPECIFICITY_FILE = os.path.join(CACHE_DIR, "specificity.json")
 EMERGING_FILE = os.path.join(DATA_DIR, "emerging.json")
+NETWORK_FILE = os.path.join(DATA_DIR, "network.json")
+NETWORK_MODULES_FILE = os.path.join(CACHE_DIR, "network_modules.json")

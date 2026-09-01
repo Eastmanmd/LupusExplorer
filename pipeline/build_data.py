@@ -24,6 +24,30 @@ HUMAN_TAXID = 9606
 MERGE_TAXIDS = {9606, 10090, 10116}  # human, mouse, rat: merge homologs by symbol
 
 
+def merge_homologs(candidates, info):
+    """Entrez id -> pmids, collapsed to {SYMBOL: {pmids, human entrez id}}.
+
+    PubTator annotates the mouse and rat genes in a paper alongside the human
+    ones, and a lupus paper about Tlr7 is a lupus paper about TLR7. Groups with
+    no human member are dropped: they are plants, microbes and other-species
+    annotations that are not lupus genes.
+
+    Shared by build_data, build_emerging and build_network so all three see the
+    same genes with the same paper sets.
+    """
+    groups = {}
+    for gid, pmids in candidates.items():
+        gi = info.get(gid) or {}
+        symbol, taxid = gi.get("symbol"), gi.get("taxid")
+        if not symbol or taxid not in MERGE_TAXIDS:
+            continue
+        group = groups.setdefault(symbol.upper(), {"pmids": set(), "human": None})
+        group["pmids"].update(pmids)
+        if taxid == HUMAN_TAXID and group["human"] is None:
+            group["human"] = gid
+    return {k: g for k, g in groups.items() if g["human"] is not None}
+
+
 def load_mentions():
     articles = {}
     gene_articles = defaultdict(list)  # entrez id -> [pmid]
@@ -130,20 +154,7 @@ def main():
           f"{config.MIN_PAPERS_FOR_CANDIDATE} papers")
     info = fetch_gene_info(sorted(candidates))
 
-    # Merge human/mouse/rat homologs under the uppercased symbol; the human
-    # Entrez id is canonical. Groups with no human member are dropped (plants,
-    # microbes, and other-species annotations that aren't lupus genes).
-    groups = {}
-    for gid, pmids in candidates.items():
-        gi = info.get(gid) or {}
-        symbol, taxid = gi.get("symbol"), gi.get("taxid")
-        if not symbol or taxid not in MERGE_TAXIDS:
-            continue
-        key = symbol.upper()
-        group = groups.setdefault(key, {"members": [], "human": None})
-        group["members"].append((gid, taxid, pmids))
-        if taxid == HUMAN_TAXID and group["human"] is None:
-            group["human"] = gid
+    groups = merge_homologs(candidates, info)
 
     with open(config.OPENTARGETS_FILE) as f:
         opentargets = json.load(f)
@@ -156,11 +167,7 @@ def main():
 
     genes = []
     for key, group in groups.items():
-        if group["human"] is None:
-            continue
-        pmid_set = set()
-        for _, _, pmids in group["members"]:
-            pmid_set.update(pmids)
+        pmid_set = group["pmids"]
         year_counts = defaultdict(int)
         for pmid in pmid_set:
             y = articles[pmid]["year"]
@@ -176,7 +183,10 @@ def main():
         prior = sum(c for y, c in year_counts.items()
                     if prior_start <= y < recent_cutoff)
         velocity = (recent + 1) / (prior + 1)
-        peak_year = max(year_counts, key=lambda y: year_counts[y]) if year_counts else None
+        # Later year wins a tie: `year_counts` is built by iterating a set, so
+        # bare max() picks whichever tied year happened to be inserted first and
+        # the sparkline's peak marker moves between otherwise identical runs.
+        peak_year = max(year_counts, key=lambda y: (year_counts[y], y)) if year_counts else None
         human_gi = info[group["human"]]
         ot = opentargets.get(human_gi["symbol"], {})
         drug = drugs.get(human_gi["symbol"], {})
@@ -187,8 +197,11 @@ def main():
             "papers": total,
             "recent_papers": recent,
             "year_counts": dict(sorted(year_counts.items())),
+            # PMID descending as the tie-break within a year: `pmid_set` is a
+            # set, so without it the sample of same-year articles reshuffles
+            # every run and the weekly refresh commits churn that means nothing.
             "pmids_by_year": sorted(
-                pmid_set, key=lambda p: articles[p]["year"] or 0, reverse=True),
+                pmid_set, key=lambda p: (articles[p]["year"] or 0, p), reverse=True),
             "ot_score": ot.get("score", 0.0),
             "ot_genetic": ot.get("datatypes", {}).get("genetic_association", 0.0),
             "ot_datatypes": {k: round(v, 3) for k, v in ot.get("datatypes", {}).items()},

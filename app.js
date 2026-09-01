@@ -22,6 +22,8 @@ const state = {
   targetRanked: [],     // targets re-scored under the live pillar weights
   emerging: [],         // genes whose lupus literature is improbably recent
   emergingMeta: null,   // baseline, splits and quadrant definitions
+  network: null,        // co-mention graph: nodes with layout, edges, modules
+  networkBySymbol: new Map(),
 };
 
 const WEIGHT_KEYS = ["mentions", "recency", "opentargets"];
@@ -488,11 +490,12 @@ function readTargetWeightsFromHash() {
 
 /* Single writer for the URL hash, so a custom weighting survives navigation
    and a shared link restores both the gene and the weighting. */
-function setHash({ gene, target, emerging } = {}) {
+function setHash({ gene, target, emerging, network } = {}) {
   const params = new URLSearchParams();
   if (gene) params.set("gene", gene);
   if (target) params.set("target", target);
   if (emerging) params.set("emerging", emerging);
+  if (network) params.set("network", network);
   if (!weightsAreDefault()) {
     params.set("w", WEIGHT_KEYS.map(k => state.weights[k].toFixed(2)).join(","));
   }
@@ -2134,8 +2137,498 @@ function showEmergingDetail(symbol) {
           ? el("button", { class: "back-btn", onclick: () => showTargetDetail(g.symbol) },
               `Target opportunity score for ${g.symbol} →`)
           : null,
+        // The network answers the question this tab raises but cannot: a gene
+        // is new here, so who is it new *alongside*? EXT1, NELL1 and SEMA3B all
+        // land next to PLA2R1, which is why they arrived together.
+        inNetwork(g.symbol)
+          ? el("button", { class: "back-btn", onclick: () => showNetworkDetail(g.symbol) },
+              `Where ${g.symbol} sits in the co-mention network →`)
+          : null,
         el("a", { class: "back-btn",
           href: `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(`(${g.symbol}) AND (lupus)`)}&sort=date`,
+          target: "_blank", rel: "noopener" }, "Search PubMed ↗"))),
+  ].filter(Boolean));
+  switchView("detail", { keepHash: true });
+  window.scrollTo({ top: 0 });
+}
+
+/* ---------- co-mention network ---------- */
+/* Every edge here exists because PubTator found two genes in the same abstract.
+   Nothing else feeds the structure — see pipeline/build_network.py. Layout is
+   precomputed and shipped, so the map is the same on every visit and can be
+   learned; the browser only draws it. */
+const MODULE_VARS = ["--mod-1", "--mod-2", "--mod-3", "--mod-4", "--mod-5",
+                     "--mod-6", "--mod-7", "--mod-8", "--mod-9", "--mod-10",
+                     "--mod-11"];
+const networkFilter = { q: "", perNode: 4, module: "all",
+                        colourEdgesByAge: false, showLabels: true };
+
+/* Whether the network tab has anything to say about a gene: it is either on
+   the map, or small enough to be off it but still co-mentioned often enough to
+   be placed beside it. */
+function inNetwork(symbol) {
+  return !!state.network
+    && (state.networkBySymbol.has(symbol) || !!state.network.neighbours[symbol]);
+}
+
+function moduleColour(moduleId) {
+  const m = state.network.modules[moduleId];
+  if (!m || !m.coloured) return "var(--muted)";
+  return `var(${MODULE_VARS[moduleId % MODULE_VARS.length]})`;
+}
+
+/* The shipped edge list is each gene's strongest k; the slider tightens that
+   client-side rather than re-fetching, so it stays a redraw and never a
+   relayout — node positions must not move when you thin the edges. */
+function networkEdges() {
+  const { edges } = state.network;
+  const perNode = networkFilter.perNode;
+  if (perNode >= state.network.edges_per_node) return edges;
+  const kept = new Set();
+  const byNode = new Map();
+  edges.forEach((e, i) => {
+    for (const n of [e[0], e[1]]) {
+      if (!byNode.has(n)) byNode.set(n, []);
+      byNode.get(n).push(i);
+    }
+  });
+  for (const list of byNode.values()) {
+    list.sort((x, y) => edges[y][3] - edges[x][3]);
+    for (const i of list.slice(0, perNode)) kept.add(i);
+  }
+  return [...kept].sort((a, b) => a - b).map(i => edges[i]);
+}
+
+/* Old → new on the same sequential ramp the evidence strips use. */
+function edgeAgeColour(recentShare) {
+  if (recentShare >= 0.5) return "var(--series-2)";
+  if (recentShare >= 0.3) return "var(--seq-350)";
+  return "var(--seq-150)";
+}
+
+function networkMap(focus) {
+  const net = state.network;
+  const W = net.width, H = net.height;
+  const nodes = net.nodes;
+  const edges = networkEdges();
+  const drawn = nodes.filter(n => n.x != null);
+  const papers = drawn.map(n => n.papers);
+  const logMin = Math.log(Math.min(...papers)), logMax = Math.log(Math.max(...papers));
+  const radius = n => 3.5 + 6.5 * ((Math.log(n.papers) - logMin) / (logMax - logMin || 1));
+
+  const adjacency = new Map();
+  for (const [a, b] of edges) {
+    if (!adjacency.has(a)) adjacency.set(a, new Set());
+    if (!adjacency.has(b)) adjacency.set(b, new Set());
+    adjacency.get(a).add(b);
+    adjacency.get(b).add(a);
+  }
+  const focusIndex = focus == null ? null : nodes.findIndex(n => n.symbol === focus);
+  const lit = focusIndex == null ? null
+    : new Set([focusIndex, ...(adjacency.get(focusIndex) || [])]);
+  const dimmedByModule = networkFilter.module !== "all";
+
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "network-svg",
+    role: "img", "aria-label":
+      `Co-mention network: ${drawn.length} genes, ${edges.length} edges, ` +
+      `laid out so that genes appearing in the same papers sit together` });
+
+  const edgeLayer = svgEl("g", { class: "edge-layer" });
+  for (const [a, b, co, npmi, recent] of edges) {
+    const na = nodes[a], nb = nodes[b];
+    if (na.x == null || nb.x == null) continue;
+    const inFocus = !lit || (lit.has(a) && lit.has(b));
+    const inModule = !dimmedByModule
+      || String(na.module) === networkFilter.module
+      || String(nb.module) === networkFilter.module;
+    const line = svgEl("line", { class: "net-edge", x1: na.x, y1: na.y, x2: nb.x, y2: nb.y,
+      stroke: networkFilter.colourEdgesByAge ? edgeAgeColour(recent) : "var(--baseline)",
+      "stroke-width": (0.5 + 2.2 * npmi).toFixed(2),
+      opacity: (inFocus && inModule) ? (networkFilter.colourEdgesByAge ? 0.75 : 0.45) : 0.06 });
+    line.addEventListener("pointermove", ev =>
+      showTooltip(ev.clientX, ev.clientY, `${na.symbol} — ${nb.symbol}`, [
+        { value: fmt(co), label: co === 1 ? "paper mentions both" : "papers mention both" },
+        { value: npmi.toFixed(2), label: "association strength (npmi)" },
+        { value: `${Math.round(recent * 100)}%`,
+          label: `of those are from ${net.recent_from}–${net.complete_year}` },
+      ]));
+    line.addEventListener("pointerleave", hideTooltip);
+    edgeLayer.append(line);
+  }
+  svg.append(edgeLayer);
+
+  const nodeLayer = svgEl("g", { class: "node-layer" });
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    if (n.x == null) continue;
+    const inFocus = !lit || lit.has(i);
+    const inModule = !dimmedByModule || String(n.module) === networkFilter.module;
+    const dot = svgEl("circle", { class: "net-node", cx: n.x, cy: n.y, r: radius(n),
+      fill: moduleColour(n.module),
+      stroke: n.drug_stage ? "var(--ink)" : "var(--surface)",
+      "stroke-width": n.drug_stage ? 1.6 : 0.8,
+      opacity: (inFocus && inModule) ? 1 : 0.12 });
+    dot.addEventListener("pointermove", ev => {
+      const mod = net.modules[n.module];
+      showTooltip(ev.clientX, ev.clientY, `${n.symbol} — ${n.name}`, [
+        { value: fmt(n.papers), label: "lupus papers", color: moduleColour(n.module) },
+        { value: String(n.degree), label: "co-mention partners" },
+        { value: (mod && mod.label) || `module ${n.module}`, label: `${mod ? mod.size : 0} genes` },
+        ...(n.drug_stage ? [{ value: (STAGE_BADGE[n.drug_stage] || [n.drug_stage])[0],
+                             label: "SLE drug or candidate" }] : []),
+      ]);
+    });
+    dot.addEventListener("pointerleave", hideTooltip);
+    dot.addEventListener("click", () => showNetworkDetail(n.symbol));
+    nodeLayer.append(dot);
+  }
+  svg.append(nodeLayer);
+
+  // Module captions at each module's centre of mass. These are what make a
+  // 300-node picture readable — without them it is a coloured cloud.
+  if (networkFilter.showLabels) {
+    const labelLayer = svgEl("g", { class: "module-label-layer" });
+    // Captions sit on their module's centre of mass, which puts the two
+    // densest modules' text on top of each other. Nudge each one clear of the
+    // ones already placed — biggest module first, so the most important
+    // caption keeps the spot it earned.
+    const placed = [];
+    for (const mod of net.modules) {
+      if (!mod.coloured || !mod.label) continue;
+      const members = mod.genes.map(s => state.networkBySymbol.get(s)).filter(n => n && n.x != null);
+      if (members.length < 3) continue;
+      const cx = members.reduce((a, n) => a + n.x, 0) / members.length;
+      let cy = members.reduce((a, n) => a + n.y, 0) / members.length;
+      for (let guard = 0; guard < 24; guard++) {
+        const clash = placed.find(p => Math.abs(p.x - cx) < 190 && Math.abs(p.y - cy) < 15);
+        if (!clash) break;
+        cy = clash.y + 16;
+      }
+      placed.push({ x: cx, y: cy });
+      const faded = dimmedByModule && String(mod.id) !== networkFilter.module;
+      labelLayer.append(svgEl("text", { class: "module-caption", x: cx, y: cy,
+        "text-anchor": "middle", fill: moduleColour(mod.id),
+        opacity: faded ? 0.15 : 1 }, mod.label.length > 34 ? mod.label.slice(0, 32) + "…" : mod.label));
+    }
+    svg.append(labelLayer);
+  }
+
+  if (focus) {
+    const n = state.networkBySymbol.get(focus);
+    if (n && n.x != null) {
+      svg.append(svgEl("circle", { class: "net-focus-ring", cx: n.x, cy: n.y,
+        r: radius(n) + 6, fill: "none", stroke: "var(--ink)", "stroke-width": 1.5 }));
+      svg.append(svgEl("text", { class: "net-focus-label", x: n.x, y: n.y - radius(n) - 11,
+        "text-anchor": "middle" }, n.symbol));
+    }
+  }
+  return el("div", { class: "chart-box network-box" }, svg);
+}
+
+function renderNetworkView() {
+  const view = document.getElementById("view-network");
+  const net = state.network;
+  const named = net.modules.filter(m => m.coloured && m.label);
+  const offMap = Object.keys(net.neighbours).length;
+
+  const search = el("input", { type: "search", value: networkFilter.q,
+    placeholder: "Find a gene…", list: "network-options",
+    oninput: e => { networkFilter.q = e.target.value; renderNetworkBody(); } });
+  const datalist = el("datalist", { id: "network-options" },
+    ...net.nodes.map(n => el("option", { value: n.symbol })),
+    ...Object.keys(net.neighbours).map(s => el("option", { value: s })));
+
+  const slider = el("input", { type: "range", min: "1", max: String(net.edges_per_node),
+    step: "1", value: String(networkFilter.perNode), "aria-label": "Edges kept per gene",
+    oninput: e => {
+      networkFilter.perNode = Number(e.target.value);
+      document.getElementById("per-node-val").textContent = e.target.value;
+      renderNetworkBody();
+    } });
+  const moduleSelect = el("select", { "aria-label": "Module",
+    onchange: e => { networkFilter.module = e.target.value; renderNetworkBody(); } },
+    ...[["all", "All modules"],
+        ...net.modules.filter(m => m.size >= 3)
+          .map(m => [String(m.id), `${m.label || `Module ${m.id}`} (${m.size})`])]
+      .map(([v, text]) => {
+        const o = el("option", { value: v }, text);
+        if (networkFilter.module === v) o.selected = true;
+        return o;
+      }));
+  const check = (key, label, title) => {
+    const box = el("input", { type: "checkbox",
+      onchange: e => { networkFilter[key] = e.target.checked; renderNetworkBody(); } });
+    box.checked = networkFilter[key];
+    return el("label", { class: "check", title }, box, label);
+  };
+
+  view.replaceChildren(
+    el("div", { class: "card intro-card" },
+      el("h2", {}, "Co-mention network"),
+      el("p", {},
+        "Two genes are joined here because papers mention them together. That is the " +
+        "whole of it — ", el("strong", {}, "every edge, weight and module on this map " +
+        "comes from the mention data and nothing else."),
+        " No interaction database, no pathway membership, no Open Targets. Even the " +
+        "gene set is the " + fmt(net.nodes.length) + " genes with the most lupus papers " +
+        `(${fmt(net.paper_floor)} or more), rather than the leaderboard's top 300, ` +
+        "because that ranking is 30% Open Targets and would have let a curated database " +
+        "decide who appears on a map billed as pure co-mention."),
+      el("p", { class: "sub" },
+        "Edge weight is the raw count of papers mentioning both genes. Which edges " +
+        "survive is a different question: the most-published genes co-occur constantly " +
+        "whatever the biology — IL6 and TNF share 754 papers and it means nothing — so " +
+        "each pair is first gated on a hypergeometric tail probability (is this more " +
+        "overlap than chance?) and then kept on normalized pointwise mutual information " +
+        "(how much more?). Each gene keeps its strongest few partners and the union is " +
+        "the map, which is why no hub swallows the picture."),
+      el("p", { class: "sub" },
+        "Modules are found by modularity optimisation over those edges, then named by asking " +
+        "g:Profiler what they have in common — the labels are annotation laid over " +
+        "structure that co-mention had already produced, not an input to it. A module " +
+        "with no caption is one no ontology term fits, which is usually the interesting " +
+        "case: an antibody panel, a GWAS locus, a clinical syndrome."),
+      el("p", { class: "sub" },
+        el("strong", {}, "Co-mention is not interaction."),
+        " TG and TPO sit together because both are on a thyroid antibody panel; BLK and " +
+        "FAM167A because they share one linkage block. This is a map of how the " +
+        "literature groups genes — part biology, part assay panel, part GWAS locus. The ",
+        el("button", { class: "linklike", onclick: () => switchView("pathways") }, "Pathways"),
+        " tab is the curated counterpart, and the disagreements between them are the " +
+        "point.")),
+    el("div", { class: "kpi-row" },
+      statTile("Genes on the map", fmt(net.nodes.length - net.isolated.length),
+        `${fmt(net.paper_floor)}+ lupus papers each`),
+      statTile("Co-mention edges", fmt(net.edges.length),
+        `p < ${net.p_threshold}, top ${net.edges_per_node} per gene`),
+      statTile("Modules", fmt(net.modules.filter(m => m.size >= 3).length),
+        `${fmt(net.modules.filter(m => m.label).length)} matched a named term`),
+      statTile("Off-map neighbourhoods", fmt(offMap),
+        "genes too small for the map, still placeable")),
+    el("div", { class: "card" },
+      el("div", { class: "legend quadrant-legend", id: "network-legend" }),
+      el("div", { class: "filter-row network-controls" },
+        search, datalist, moduleSelect,
+        el("label", { class: "check net-slider",
+          title: "Each gene keeps this many of its strongest partners" },
+          "Edges per gene", slider, el("span", { id: "per-node-val" }, String(networkFilter.perNode))),
+        check("colourEdgesByAge", "Colour edges by age",
+          `Orange where most co-mentions are from ${net.recent_from}–${net.complete_year}`),
+        check("showLabels", "Module captions", "Show the named modules on the map"),
+        el("span", { class: "count", id: "network-count" })),
+      el("div", { id: "network-map" }),
+      el("p", { class: "sub net-key" },
+        "Dot size is lupus papers; colour is module; a dark ring means an SLE drug or " +
+        "trial candidate exists against that gene. Hover a gene to isolate its " +
+        "neighbourhood, click for its full ego network.")),
+    el("div", { class: "card" },
+      el("h2", {}, "Modules"),
+      el("p", { class: "sub" },
+        "Found from the edges, then named. “vs the map” means the term is " +
+        "enriched against the other " + fmt(net.nodes.length - 1) + " genes here — what " +
+        "makes the module different from the rest of the board. “vs the genome” " +
+        "is the looser fallback used when nothing clears that bar."),
+      el("div", { class: "table-scroll" },
+        el("table", { class: "data" },
+          el("thead", {}, el("tr", {},
+            el("th", {}, "Module"), el("th", { class: "num" }, "Genes"),
+            el("th", {}, "Enriched term"), el("th", {}, "Members"))),
+          el("tbody", { id: "network-modules" })))),
+    net.isolated.length
+      ? el("div", { class: "card" },
+          el("h2", {}, "No strong partners"),
+          el("p", { class: "sub" },
+            `${net.isolated.length} genes on the board have no co-mention that clears ` +
+            "the threshold. Some are studied alone (autoantibody targets, single " +
+            "biomarkers); some are simply named in passing across unrelated papers."),
+          el("div", { class: "chip-row" },
+            ...net.isolated.map(s => el("button", { class: "chip",
+              onclick: () => showNetworkDetail(s) }, s))))
+      : null,
+  );
+  renderNetworkBody();
+}
+
+function renderNetworkBody() {
+  const net = state.network;
+  const q = networkFilter.q.trim().toUpperCase();
+  const focus = q && (state.networkBySymbol.has(q) || net.neighbours[q]) ? q : null;
+  const edges = networkEdges();
+  document.getElementById("network-count").textContent =
+    `${fmt(edges.length)} edges shown`;
+
+  document.getElementById("network-legend").replaceChildren(
+    ...net.modules.filter(m => m.coloured).map(m => {
+      const active = networkFilter.module === String(m.id);
+      return el("button", { class: `legend-btn${active ? " active" : ""}`,
+        title: m.genes.join(", "),
+        onclick: () => {
+          networkFilter.module = active ? "all" : String(m.id);
+          renderNetworkBody();
+        } },
+        el("span", { class: "swatch", style: `background:${moduleColour(m.id)}` }),
+        `${m.label || `Module ${m.id}`} (${m.size})`);
+    }));
+
+  document.getElementById("network-map").replaceChildren(
+    networkMap(focus && state.networkBySymbol.has(focus) ? focus : null));
+
+  document.getElementById("network-modules").replaceChildren(
+    ...net.modules.filter(m => m.size >= 3).map(m => el("tr", {},
+      el("td", {},
+        el("span", { class: "swatch", style: `background:${moduleColour(m.id)}` }),
+        m.label || el("span", { class: "muted" }, "no term fits")),
+      el("td", { class: "num muted" }, String(m.size)),
+      el("td", { class: "muted" }, m.label
+        ? `${m.source} · p = ${m.p.toExponential(1)} · vs the ${m.scope === "map" ? "map" : "genome"}`
+        : "—"),
+      el("td", {}, el("div", { class: "module-members" },
+        ...m.genes.map(s => el("button", { class: "chip",
+          onclick: () => showNetworkDetail(s) }, s)))))));
+}
+
+function showNetworkDetail(symbol) {
+  const net = state.network;
+  const node = state.networkBySymbol.get(symbol);
+  const offMap = net.neighbours[symbol];
+  if (!node && !offMap) return;
+  setHash({ network: symbol });
+
+  // Partners come from the full significant edge set, not the thinned view:
+  // the slider is a decluttering control for the picture, not a claim that the
+  // dropped partners stopped existing.
+  const partners = [];
+  if (node) {
+    const self = net.nodes.indexOf(node);
+    for (const [a, b, co, npmi, recent] of net.edges) {
+      if (a === self) partners.push({ other: net.nodes[b], co, npmi, recent });
+      else if (b === self) partners.push({ other: net.nodes[a], co, npmi, recent });
+    }
+    partners.sort((x, y) => y.npmi - x.npmi);
+  }
+  const mod = node && net.modules[node.module];
+  const emergingRow = state.emerging.find(g => g.symbol === symbol);
+
+  // Off-map genes have no npmi or recency — they were never scored as edges —
+  // so those columns are dropped rather than filled with em dashes.
+  const partnerTable = (rows, scored) => el("div", { class: "table-scroll" },
+    el("table", { class: "data" },
+      el("thead", {}, el("tr", {},
+        el("th", {}, "Gene"), el("th", { class: "num" }, "Shared papers"),
+        ...(scored ? [el("th", {}, "Strength")] : []),
+        el("th", {}, "Module"),
+        ...(scored ? [el("th", {}, "Recent")] : []))),
+      el("tbody", {}, ...rows)));
+
+  document.getElementById("view-detail").replaceChildren(...[
+    el("button", { class: "back-btn", onclick: () => switchView("network") },
+      "← Back to the network"),
+    el("div", { class: "detail-head" },
+      el("h2", {}, symbol),
+      el("span", { class: "muted" }, node ? node.name : ""),
+      node && node.drug_stage ? drugBadge(node) : null,
+      node
+        ? el("a", { href: `https://www.ncbi.nlm.nih.gov/gene/${node.entrez}`,
+            target: "_blank", rel: "noopener" }, "NCBI Gene ↗")
+        : null),
+    node
+      ? el("div", { class: "kpi-row" },
+          statTile("Co-mention partners", String(node.degree),
+            `above p < ${net.p_threshold}`),
+          statTile("Lupus papers", fmt(node.papers), "PubTator mentions in the corpus"),
+          statTile("Module", mod && mod.label ? mod.label : `#${node.module}`,
+            `${mod ? mod.size : 0} genes`),
+          statTile("Strongest partner", partners.length ? partners[0].other.symbol : "—",
+            partners.length ? `${fmt(partners[0].co)} shared papers` : "no edge above threshold"))
+      : el("div", { class: "kpi-row" },
+          statTile("Lupus papers", fmt(offMap.papers), "too few for the map itself"),
+          statTile("Partners on the map", String(offMap.partners.length),
+            `at least ${net.ego_min_co} shared papers each`)),
+    !node
+      ? el("div", { class: "card" },
+          el("h2", {}, "Off the map, but placeable"),
+          el("p", { class: "sub" },
+            `${symbol} has ${fmt(offMap.papers)} lupus papers — too few to earn a place ` +
+            `among the top ${fmt(net.nodes.length)}. Its co-mentions with genes that are ` +
+            "on the map still say where it sits, which is often exactly what you want " +
+            "for a gene that has only just appeared."))
+      : null,
+    (node && partners.length) || offMap
+      ? el("div", { class: "card" },
+          el("h2", {}, "Neighbourhood"),
+          el("p", { class: "sub" },
+            node
+              ? "Every gene sharing significantly more papers with " + symbol + " than " +
+                "chance would give. Strength is npmi; the last column is how much of the " +
+                `overlap is from ${net.recent_from}–${net.complete_year}.`
+              : `Genes on the map that appear alongside ${symbol}, by shared paper count.`),
+          node
+            ? partnerTable(partners.map(p => el("tr", { class: "gene-row", tabindex: "0",
+                role: "button",
+                onclick: () => showNetworkDetail(p.other.symbol),
+                onkeydown: ev => { if (ev.key === "Enter" || ev.key === " ") {
+                  ev.preventDefault(); showNetworkDetail(p.other.symbol); } } },
+                el("td", {}, el("div", { class: "gene-symbol" }, p.other.symbol),
+                  el("div", { class: "gene-name" }, p.other.name)),
+                el("td", { class: "num" }, fmt(p.co)),
+                el("td", {}, el("div", { class: "score-cell" },
+                  el("div", { class: "bar-track" },
+                    el("div", { class: "bar-fill",
+                      style: `width:${p.npmi * 100}%;background:${moduleColour(p.other.module)}` })),
+                  el("span", { class: "val" }, p.npmi.toFixed(2)))),
+                el("td", { class: "muted" },
+                  (net.modules[p.other.module] || {}).label || `#${p.other.module}`),
+                el("td", { class: "muted" }, `${Math.round(p.recent * 100)}%`))), true)
+            : partnerTable(offMap.partners.map(([idx, co]) => {
+                const other = net.nodes[idx];
+                return el("tr", { class: "gene-row", tabindex: "0", role: "button",
+                  onclick: () => showNetworkDetail(other.symbol),
+                  onkeydown: ev => { if (ev.key === "Enter" || ev.key === " ") {
+                    ev.preventDefault(); showNetworkDetail(other.symbol); } } },
+                  el("td", {}, el("div", { class: "gene-symbol" }, other.symbol),
+                    el("div", { class: "gene-name" }, other.name)),
+                  el("td", { class: "num" }, fmt(co)),
+                  el("td", { class: "muted" },
+                    (net.modules[other.module] || {}).label || `#${other.module}`));
+              }), false))
+      : el("div", { class: "card" },
+          el("h2", {}, "No strong partners"),
+          el("p", { class: "sub" },
+            `No gene shares enough papers with ${symbol} to clear p < ${net.p_threshold}. ` +
+            "That is a real finding rather than missing data: it is studied on its own.")),
+    node && mod && mod.genes.length > 1
+      ? el("div", { class: "card" },
+          el("h2", {}, mod.label || `Module ${mod.id}`),
+          el("p", { class: "sub" },
+            mod.label
+              ? `${mod.size} genes the literature keeps together. g:Profiler matches them ` +
+                `to ${mod.label} (${mod.source}, p = ${mod.p.toExponential(1)}, ` +
+                `against the ${mod.scope === "map" ? "rest of the map" : "genome"}).`
+              : `${mod.size} genes the literature keeps together, with no ontology term ` +
+                "that fits them — which usually means they share an assay, a locus or a " +
+                "clinical presentation rather than a pathway."),
+          el("div", { class: "chip-row" },
+            ...mod.genes.map(s => el("button", {
+              class: `chip${s === symbol ? " chip-current" : ""}`,
+              onclick: () => showNetworkDetail(s) }, s))))
+      : null,
+    el("div", { class: "card" },
+      el("h2", {}, "Elsewhere on this site"),
+      el("div", { class: "detail-links" },
+        state.geneBySymbol.has(symbol)
+          ? el("button", { class: "back-btn", onclick: () => showDetail(symbol) },
+              `Literature page for ${symbol} →`)
+          : null,
+        emergingRow
+          ? el("button", { class: "back-btn", onclick: () => showEmergingDetail(symbol) },
+              `Emerging: rank #${emergingRow.rank} →`)
+          : null,
+        state.targets.some(t => t.symbol === symbol)
+          ? el("button", { class: "back-btn", onclick: () => showTargetDetail(symbol) },
+              `Target opportunity score →`)
+          : null,
+        el("a", { class: "back-btn",
+          href: `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(`(${symbol}) AND (lupus)`)}&sort=date`,
           target: "_blank", rel: "noopener" }, "Search PubMed ↗"))),
   ].filter(Boolean));
   switchView("detail", { keepHash: true });
@@ -2149,13 +2642,14 @@ function switchView(name, { keepHash } = {}) {
     tab.classList.toggle("active", active);
     tab.setAttribute("aria-selected", String(active));
   }
-  for (const v of ["genes", "targets", "emerging", "pathways", "compare", "about", "detail"]) {
+  for (const v of ["genes", "targets", "emerging", "network", "pathways", "compare", "about", "detail"]) {
     document.getElementById(`view-${v}`).hidden = v !== name;
   }
   if (!keepHash) setHash();   // drops #gene= but preserves any custom weighting
   if (name === "genes") renderGenesView();
   if (name === "targets") renderTargetsView();
   if (name === "emerging") renderEmergingView();
+  if (name === "network") renderNetworkView();
   if (name === "pathways") renderPathwaysView();
   if (name === "compare") renderCompareView();
   if (name === "about") renderAboutView();
@@ -2171,8 +2665,8 @@ async function boot() {
       })));
   // Target scoring is a separate pipeline step; the dashboard still works
   // without it, so a missing file hides the tab rather than breaking the page.
-  const [targets, emerging] = await Promise.all(
-    ["targets", "emerging"].map(name => fetch(`data/${name}.json`)
+  const [targets, emerging, network] = await Promise.all(
+    ["targets", "emerging", "network"].map(name => fetch(`data/${name}.json`)
       .then(r => (r.ok ? r.json() : null)).catch(() => null)));
   state.genes = genes.genes;
   state.meta = meta;
@@ -2203,6 +2697,14 @@ async function boot() {
     emergingTab.remove();
   }
 
+  const networkTab = document.querySelector('.tab[data-view="network"]');
+  if (network && network.nodes.length) {
+    state.network = network;
+    for (const n of network.nodes) state.networkBySymbol.set(n.symbol, n);
+  } else if (networkTab) {
+    networkTab.remove();
+  }
+
   document.getElementById("loading").remove();
   document.getElementById("provenance").textContent =
     `Last updated ${meta.updated} · ${fmt(meta.corpus_articles)} articles · query: ${meta.query}`;
@@ -2214,7 +2716,11 @@ async function boot() {
   const hashGene = params.get("gene");
   const hashTarget = params.get("target");
   const hashEmerging = params.get("emerging");
+  const hashNetwork = params.get("network");
   if (hashTarget && state.targetRanked.some(t => t.symbol === hashTarget)) showTargetDetail(hashTarget);
+  else if (hashNetwork && state.network
+           && (state.networkBySymbol.has(hashNetwork) || state.network.neighbours[hashNetwork]))
+    showNetworkDetail(hashNetwork);
   else if (hashEmerging && state.emerging.some(g => g.symbol === hashEmerging)) showEmergingDetail(hashEmerging);
   else if (hashGene && state.ranked.some(g => g.symbol === hashGene)) showDetail(hashGene);
   else switchView("genes");

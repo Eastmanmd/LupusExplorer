@@ -24,6 +24,17 @@
   --seq-250: #86b6ef;  /* clinical-stage ramp, light → dark = further along */
   --seq-350: #5598e7;
   --seq-650: #104281;
+  --mod-1: #2a78d6;
+  --mod-2: #eb6834;
+  --mod-3: #1baf7a;
+  --mod-4: #7c5cd6;
+  --mod-5: #d1477f;
+  --mod-6: #a8791a;
+  --mod-7: #0f8fa8;
+  --mod-8: #8a5a3c;
+  --mod-9: #cc3b34;
+  --mod-10: #6f9e1f;
+  --mod-11: #9b3fb5;
   --organ-brain: #e87ba4;
   --organ-lung: #2a78d6;
   --organ-heart: #e34948;
@@ -56,6 +67,17 @@
     --seq-250: #1c5cab;
     --seq-350: #256abf;
     --seq-650: #9ec5f4;
+    --mod-1: #4a95ea;
+    --mod-2: #f0803f;
+    --mod-3: #2ec48d;
+    --mod-4: #9b8ff0;
+    --mod-5: #e8699a;
+    --mod-6: #cc9a33;
+    --mod-7: #35b3cc;
+    --mod-8: #b57a55;
+    --mod-9: #e35a52;
+    --mod-10: #8fbf3a;
+    --mod-11: #b968d1;
     --organ-brain: #d55181;
     --organ-lung: #3987e5;
     --organ-heart: #e66767;
@@ -431,3 +453,27 @@ tr.gene-row:hover td, tr.gene-row:focus-within td { background: var(--wash); }
   all: unset; cursor: pointer; color: var(--series-1);
 }
 .linklike:hover { text-decoration: underline; }
+
+/* ---- co-mention network ---- */
+.network-box { margin: 4px 0 2px; }
+.network-svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
+.net-edge { pointer-events: stroke; }
+.net-node { cursor: pointer; }
+.net-node:hover { stroke: var(--ink) !important; stroke-width: 2 !important; }
+.net-focus-ring { pointer-events: none; }
+.net-focus-label { fill: var(--ink); font-size: 12px; font-weight: 600; pointer-events: none; }
+.module-caption {
+  font-size: 11.5px; font-weight: 600; pointer-events: none;
+  paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round;
+}
+.network-controls { align-items: center; }
+.net-slider { gap: 8px; }
+.net-slider input[type="range"] { width: 92px; accent-color: var(--series-1); }
+.net-slider span { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 10px; }
+.net-key { margin: 6px 0 0; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-current { background: var(--wash); color: var(--ink); font-weight: 600; }
+.module-members { display: flex; flex-wrap: wrap; gap: 4px; max-width: 460px; }
+.module-members .chip { font-size: 11.5px; padding: 1px 7px; }
+td .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+  vertical-align: -1px; margin-right: 6px; }

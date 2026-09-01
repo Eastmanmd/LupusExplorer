@@ -15,6 +15,8 @@ STEPS = [
     "build_data.py",       # second pass: folds enrichment in
     "build_emerging.py",   # first pass: picks the emerging candidates, so
                            # fetch_specificity.py knows whose footprint to get
+    "build_network.py",    # gene co-mention graph, straight off the mentions
+                           # cache; independent of everything below
     # Drug-target scoring. Everything below needs the ranked gene list from
     # build_data.py, so it runs after the leaderboard is settled.
     "fetch_target_profile.py",  # tractability, constraint, essentiality, PPI
