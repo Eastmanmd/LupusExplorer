@@ -13,12 +13,16 @@ STEPS = [
     "build_data.py",       # first pass: ranks genes
     "enrich_pathways.py",  # needs genes.json from the pass above
     "build_data.py",       # second pass: folds enrichment in
+    "build_emerging.py",   # first pass: picks the emerging candidates, so
+                           # fetch_specificity.py knows whose footprint to get
     # Drug-target scoring. Everything below needs the ranked gene list from
     # build_data.py, so it runs after the leaderboard is settled.
     "fetch_target_profile.py",  # tractability, constraint, essentiality, PPI
     "fetch_cross_drugs.py",     # drugs against these targets in other
                                 # immune-mediated indications
-    "fetch_specificity.py",     # each gene's total PubMed footprint
+    "fetch_specificity.py",     # each gene's total PubMed footprint, plus the
+                                # lupus corroboration count for emerging genes
+    "build_emerging.py",        # second pass: folds those footprints in
     "score_targets.py",         # combines the above into data/targets.json
 ]
 

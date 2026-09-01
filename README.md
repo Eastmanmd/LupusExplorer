@@ -7,9 +7,10 @@
 A dashboard that tracks which genes the systemic lupus erythematosus (SLE)
 research literature is actually talking about. It ranks genes by a combined
 literature + evidence score, shows publication trends over time, maps the top
-genes onto biological pathways (GO-BP, KEGG, Reactome), and links every gene to
-the PubMed articles that mention it. Data refreshes weekly from PubMed,
-PubTator 3, Open Targets, and g:Profiler.
+genes onto biological pathways (GO-BP, KEGG, Reactome), surfaces the genes the
+field has only just started publishing on, and links every gene to the PubMed
+articles that mention it. Data refreshes weekly from PubMed, PubTator 3,
+Open Targets, and g:Profiler.
 
 ## The combined score
 
@@ -59,6 +60,88 @@ No hand-picked gene list — genes emerge from the literature itself:
    the corresponding human gene, and non-human-only hits are dropped.
 4. **Ranking**: the ~1,500 surviving genes are scored, and the top 300 are
    shown in the dashboard.
+
+## Emerging genes
+
+The combined score is built from how many lupus papers a gene has and how strong
+its curated evidence is. Both grow with accumulated attention, and the Open
+Targets score is itself partly literature-derived, so it lags by years. A gene
+whose entire lupus literature is four years old **cannot rank on the
+leaderboard**, however fast it is moving — no slider setting fixes that. The
+**Emerging genes** tab selects on the opposite property.
+
+### The gate: is this literature improbably recent?
+
+About 20% of the whole lupus corpus was published in the last five complete
+years. So for a gene with `n` lupus papers, `k` of them recent, ask how unlikely
+`k` would be if its papers had simply fallen where the corpus fell:
+
+> **p = P(X ≥ k | X ~ Binomial(n, 0.198))**
+
+A gene qualifies at **p < 0.01**, with at most **150 lupus papers** — the point
+is the genes the field has not caught up with yet. Using a real probability
+prices in the fact that the corpus itself roughly doubled over the period, which
+a raw before/after ratio does not.
+
+### The ranking: how new is it, really?
+
+That test is the gate, **not** the sort key. Statistical power grows with sample
+size, so ranking on `p` puts the best-published genes on top — TYK2's 66-of-107
+beats NELL1's 18-of-19 on significance while being far less of a newcomer, and
+"already famous" is exactly what this tab exists to exclude. Genes are ranked on
+the effect size instead, shrunk for how few papers it rests on:
+
+> **emergence = 100 × Wilson score lower bound of k/n**
+
+A gene with 18 of 19 papers in the window beats one with 66 of 107, and 5 of 5
+does not beat either.
+
+### The 2×2
+
+Each gene is placed on two axes — how recent its lupus literature is, and how
+much biology as a whole has studied it (its total PubMed footprint, from the
+same alias-expanded query the specificity denominator uses):
+
+| | **Thinly studied elsewhere** (< 1,000 papers) | **Well studied elsewhere** (≥ 1,000 papers) |
+|---|---|---|
+| **≥ 75% of its lupus papers are recent** | **Frontier** — new everywhere. NELL1, EXT1, SEMA3B, THSD7A, HERC6 | **Borrowed biology** — the mechanism and often the tool compounds already exist; what is new is someone pointing them at lupus. SLC5A2 (SGLT2), GLP1R, GSDMD, SLC7A11 |
+| **< 75%** | **Quiet climbers** — small literatures building on an earlier base. IFI44L, IFIT3, IFI27, DNASE1L3 | **Accelerating classics** — familiar proteins the field has returned to sharply. CGAS, TYK2, JAK1, CD163 |
+
+Today that is 27 / 35 / 38 / 146 genes. The top of the list is the membranous
+nephropathy antigen wave (EXT1, EXT2, NELL1, SEMA3B, THSD7A — all first
+described from 2019 on), the ferroptosis and pyroptosis genes (SLC7A11, GPX4,
+GSDMD), and the metabolic repurposing story (SLC5A2, GLP1R).
+
+This is a map of where attention is moving, **not** a ranked list of things to
+work on. A gene here has, by construction, thin evidence — that is what makes it
+new. The Target opportunities tab asks the second question, and gates hard on
+evidence when it does.
+
+### Entity collisions, and why this tab has to check for them
+
+PubTator resolves gene synonyms, which is what makes the mention counts good.
+In a literature this small it is also the main failure mode: a gene whose alias
+is also a trending acronym silently inherits that acronym's papers, and one
+collision is enough to manufacture a top-ranked "emerging gene". Five confirmed
+cases are excluded outright, each verified by reading the matched titles:
+
+| Gene | Collides with |
+|---|---|
+| NR1I3 | **CAR** (constitutive androstane receptor) vs CAR-T cell therapy |
+| CXADRP1 | **CAR** (coxsackie-adenovirus receptor) vs CAR-T cell therapy |
+| CARTPT | **CART** vs CAR-T cell therapy |
+| ABCB6 | **ABC** vs atypical B cells |
+| RALGAPA1 | **TULIP1** vs the TULIP-1/TULIP-2 anifrolumab trials |
+
+Left in, NR1I3 and CXADRP1 rank first and second on raw recency.
+
+For everything else the check is computed, not curated: the same alias-expanded
+query is run against PubMed's own index *restricted to the lupus corpus*, and
+the ratio of that count to PubTator's mention count is shown on every gene. A
+ratio outside 0.25–8 flags the gene as **check mentions** — 24 genes today,
+including PIK3CA/PIK3CB, whose recent "mentions" are mostly generic PI3K
+signalling papers. Flagged genes stay in the table and are drawn faded in the
+scatter rather than being silently dropped.
 
 ## Finding a drug target
 

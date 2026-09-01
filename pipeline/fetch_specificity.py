@@ -12,7 +12,12 @@ has more lupus papers than papers literally containing "TNFSF13B"). Aliases
 come from Entrez and go into the query, so numerator and denominator count the
 same way.
 
-Writes cache/specificity.json: {symbol: {total, aliases, query}}. Incremental.
+Emerging genes get a second count: the same alias query restricted to the lupus
+corpus. Comparing it with PubTator's mention count is a cheap independent check
+on genes whose whole literature is small — see build_emerging.py.
+
+Writes cache/specificity.json: {symbol: {total, aliases, query, lupus?}}.
+Incremental in both counts.
 """
 import json
 import os
@@ -73,12 +78,45 @@ def fetch_aliases(session, entrez_ids):
     return aliases
 
 
+def count(session, label, query):
+    """esearch hit count, or None if PubMed will not answer."""
+    for attempt in range(4):
+        try:
+            r = session.post(f"{config.EUTILS_BASE}/esearch.fcgi",
+                             data={"db": "pubmed", "term": query,
+                                   "rettype": "count", "retmode": "json"},
+                             timeout=60)
+            r.raise_for_status()
+            return int(r.json()["esearchresult"]["count"])
+        except Exception as e:
+            print(f"  {label} retry {attempt + 1}: {e}")
+            time.sleep(2 ** attempt)
+    print(f"  {label}: giving up, leaving uncached")
+    return None
+
+
+def alias_query(symbol, aliases):
+    terms = [symbol] + [a for a in aliases if a != symbol]
+    return " OR ".join(f'"{t}"[tiab]' for t in terms)
+
+
 def main():
     path = os.path.join(config.DATA_DIR, "genes.json")
     if not os.path.exists(path):
         raise SystemExit("data/genes.json missing — run build_data.py first")
     with open(path) as f:
-        genes = [(g["symbol"], g["entrez"]) for g in json.load(f)["genes"]]
+        entrez = {g["symbol"]: g["entrez"] for g in json.load(f)["genes"]}
+
+    # Emerging genes sit outside the ranked top N, so their footprints are not
+    # in the cache yet; they also need the lupus-restricted corroboration count.
+    emerging = []
+    if os.path.exists(config.EMERGING_FILE):
+        with open(config.EMERGING_FILE) as f:
+            rows = json.load(f)["genes"]
+        emerging = [g["symbol"] for g in rows]
+        entrez.update({g["symbol"]: g["entrez"] for g in rows})
+    else:
+        print("NOTE: no data/emerging.json yet; skipping corroboration counts")
 
     cache = {}
     if os.path.exists(config.SPECIFICITY_FILE):
@@ -88,41 +126,45 @@ def main():
         # counts were symbol-only and are not comparable, so drop them.
         cache = {k: v for k, v in loaded.items() if isinstance(v, dict)}
 
-    todo = [(s, e) for s, e in genes if s not in cache]
-    print(f"PubMed totals: {len(genes)} genes, {len(todo)} to fetch")
+    need_total = [s for s in entrez if s not in cache]
+    need_lupus = [s for s in emerging if cache.get(s, {}).get("lupus") is None]
+    todo = sorted(set(need_total) | set(need_lupus), key=lambda s: (s not in need_total, s))
+    print(f"PubMed totals: {len(entrez)} genes, {len(need_total)} footprints and "
+          f"{len(need_lupus)} lupus counts to fetch")
     if not todo:
         return
 
     session = requests.Session()
-    aliases = fetch_aliases(session, [e for _, e in todo])
-    print(f"  resolved aliases for {sum(1 for v in aliases.values() if v)} genes")
+    # Aliases are already stored for anything counted before; only resolve the
+    # symbols that have never been seen.
+    aliases = {s: cache[s].get("aliases", []) for s in todo if s in cache}
+    fresh = [s for s in todo if s not in cache]
+    if fresh:
+        aliases.update(fetch_aliases(session, [entrez[s] for s in fresh]))
+        print(f"  resolved aliases for {sum(1 for s in fresh if aliases.get(s))} genes")
 
-    for i, (symbol, _) in enumerate(todo, 1):
-        terms = [symbol] + [a for a in aliases.get(symbol, []) if a != symbol]
-        query = " OR ".join(f'"{t}"[tiab]' for t in terms)
-        total = None
-        for attempt in range(4):
-            try:
-                r = session.post(f"{config.EUTILS_BASE}/esearch.fcgi",
-                                 data={"db": "pubmed", "term": query,
-                                       "rettype": "count", "retmode": "json"},
-                                 timeout=60)
-                r.raise_for_status()
-                total = int(r.json()["esearchresult"]["count"])
-                break
-            except Exception as e:
-                print(f"  {symbol} retry {attempt + 1}: {e}")
-                time.sleep(2 ** attempt)
-        if total is None:
-            print(f"  {symbol}: giving up, leaving uncached")
-            continue
-        cache[symbol] = {"total": total, "aliases": aliases.get(symbol, []),
-                         "query": query}
+    lupus_set = set(need_lupus)
+    for i, symbol in enumerate(todo, 1):
+        query = cache.get(symbol, {}).get("query") or alias_query(symbol, aliases.get(symbol, []))
+        entry = cache.setdefault(symbol, {"aliases": aliases.get(symbol, []),
+                                          "query": query})
+        if entry.get("total") is None:
+            total = count(session, symbol, query)
+            if total is None:
+                cache.pop(symbol, None)   # leave uncached so a rerun retries it
+                continue
+            entry["total"] = total
+            time.sleep(config.EUTILS_DELAY)
+        if symbol in lupus_set and entry.get("lupus") is None:
+            lupus = count(session, f"{symbol} (lupus)",
+                          f"({query}) AND ({config.PUBMED_QUERY})")
+            if lupus is not None:
+                entry["lupus"] = lupus
+            time.sleep(config.EUTILS_DELAY)
         if i % 25 == 0 or i == len(todo):
             print(f"  {i}/{len(todo)}")
             with open(config.SPECIFICITY_FILE, "w") as f:
                 json.dump(cache, f)
-        time.sleep(config.EUTILS_DELAY)
 
     with open(config.SPECIFICITY_FILE, "w") as f:
         json.dump(cache, f)

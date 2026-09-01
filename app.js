@@ -20,6 +20,8 @@ const state = {
   targetMeta: null,     // pillar + criterion definitions shipped with the data
   targetWeights: null,  // {evidence, tractability, safety, opportunity}
   targetRanked: [],     // targets re-scored under the live pillar weights
+  emerging: [],         // genes whose lupus literature is improbably recent
+  emergingMeta: null,   // baseline, splits and quadrant definitions
 };
 
 const WEIGHT_KEYS = ["mentions", "recency", "opentargets"];
@@ -486,10 +488,11 @@ function readTargetWeightsFromHash() {
 
 /* Single writer for the URL hash, so a custom weighting survives navigation
    and a shared link restores both the gene and the weighting. */
-function setHash({ gene, target } = {}) {
+function setHash({ gene, target, emerging } = {}) {
   const params = new URLSearchParams();
   if (gene) params.set("gene", gene);
   if (target) params.set("target", target);
+  if (emerging) params.set("emerging", emerging);
   if (!weightsAreDefault()) {
     params.set("w", WEIGHT_KEYS.map(k => state.weights[k].toFixed(2)).join(","));
   }
@@ -714,7 +717,7 @@ function showDetail(symbol) {
     .map(t => el("button", { class: "chip", onclick: () => { showPathways(t.source); } },
       t.name, el("span", { class: "src" }, t.source)));
 
-  view.replaceChildren(
+  view.replaceChildren(...[
     el("button", { class: "back-btn", onclick: () => switchView("genes") }, "← Back to leaderboard"),
     el("div", { class: "detail-head" },
       el("h2", {}, g.symbol),
@@ -757,7 +760,7 @@ function showDetail(symbol) {
           el("td", {}, el("a", { href: `https://pubmed.ncbi.nlm.nih.gov/${a.pmid}/`, target: "_blank", rel: "noopener" },
             a.title || `PMID ${a.pmid}`)),
           el("td", { class: "muted" }, a.journal)))))),
-  );
+  ].filter(Boolean));
   switchView("detail", { keepHash: true });
   window.scrollTo({ top: 0 });
 }
@@ -1619,7 +1622,9 @@ function showTargetDetail(symbol) {
   const view = document.getElementById("view-detail");
   const leaderboardGene = state.geneBySymbol.get(symbol);
 
-  view.replaceChildren(
+  // replaceChildren stringifies non-nodes, so a `null` branch renders the word
+  // "null" — unlike el(), which drops them.
+  view.replaceChildren(...[
     el("button", { class: "back-btn", onclick: () => switchView("targets") },
       "← Back to target opportunities"),
     el("div", { class: "detail-head" },
@@ -1692,7 +1697,447 @@ function showTargetDetail(symbol) {
           el("button", { class: "back-btn", onclick: () => showDetail(symbol) },
             `Open the full literature page for ${t.symbol} →`))
       : null,
+  ].filter(Boolean));
+  switchView("detail", { keepHash: true });
+  window.scrollTo({ top: 0 });
+}
+
+/* ---------- emerging genes ---------- */
+/* The leaderboard answers "what is the field talking about". This answers
+   "what has the field only just started talking about" — a question its score
+   cannot express, because two of its three terms grow with accumulated
+   attention. See pipeline/build_emerging.py for the statistics. */
+const QUADRANT_COLORS = {
+  borrowed: "var(--series-2)",
+  frontier: "var(--series-3)",
+  accelerating: "var(--series-1)",
+  climbers: "var(--series-4)",
+};
+const SUPERSCRIPTS = "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079";
+function supers(n) {
+  return String(n).replace(/\d/g, d => SUPERSCRIPTS[+d]);
+}
+const emergingFilter = { q: "", quadrant: "all", newOnly: false,
+                         hideUnverified: false, openOnly: false };
+
+function emergingRows() {
+  const q = emergingFilter.q.trim().toLowerCase();
+  const cutoff = state.emergingMeta.recent_cutoff;
+  return state.emerging.filter(g => {
+    if (q && !g.symbol.toLowerCase().includes(q) && !g.name.toLowerCase().includes(q)) return false;
+    if (emergingFilter.quadrant !== "all" && g.quadrant !== emergingFilter.quadrant) return false;
+    if (emergingFilter.newOnly && g.debut < cutoff) return false;
+    if (emergingFilter.hideUnverified && g.unverified) return false;
+    if (emergingFilter.openOnly && g.drug_stage) return false;
+    return true;
+  });
+}
+
+/* Corroboration: an independent PubMed keyword search for the same gene inside
+   the same lupus corpus. PubTator resolves synonyms, so a gene whose alias is
+   also a trending acronym silently inherits that acronym's papers — in a
+   literature this small one collision is enough to invent a top-ranked gene.
+   When the two counts disagree badly, say so rather than hiding it. */
+function corroborationNote(g) {
+  if (g.corroboration == null) return null;
+  const [lo, hi] = state.emergingMeta.corroboration_range;
+  const badge = el("span", { class: `badge ${g.unverified ? "unverified" : "verified"}` },
+    g.unverified ? "check mentions" : `${g.corroboration}× corroborated`);
+  badge.addEventListener("pointermove", ev =>
+    showTooltip(ev.clientX, ev.clientY, "PubTator mentions vs a keyword search", [
+      { value: fmt(g.papers), label: "PubTator gene mentions in the corpus" },
+      { value: fmt(g.pubmed_lupus), label: "papers matching the gene's own name or aliases" },
+      { value: `${g.corroboration}×`, label: `ratio — expected between ${lo} and ${hi}` },
+      ...(g.aliases || []).length
+        ? [{ value: g.aliases.slice(0, 5).join(", "), label: "aliases searched" }] : [],
+    ]));
+  badge.addEventListener("pointerleave", hideTooltip);
+  return badge;
+}
+
+/* Scatter of the two axes, split into the four quadrants. X is a log axis
+   because PubMed footprints span five orders of magnitude; a linear one would
+   pile every gene against the left edge. */
+function quadrantChart(rows) {
+  const m = state.emergingMeta;
+  const pts = rows.filter(g => g.pubmed_total > 0);
+  if (!pts.length) {
+    return el("p", { class: "muted" }, "No genes match these filters.");
+  }
+  const W = 900, H = 460, padL = 52, padR = 18, padT = 20, padB = 46;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const totals = pts.map(g => g.pubmed_total);
+  const lo = Math.max(1, Math.floor(Math.log10(Math.min(...totals))));
+  const hi = Math.max(lo + 1, Math.ceil(Math.log10(Math.max(...totals))));
+  const px = t => padL + ((Math.log10(t) - lo) / (hi - lo)) * plotW;
+  // The y axis starts just under the lowest gene, not at zero and not at the
+  // corpus baseline: every gene here clears that baseline by construction, so
+  // anchoring to it would spend a fifth of the plot on an empty band.
+  const yLo = Math.max(0, Math.floor(Math.min(...pts.map(g => g.recent_share)) * 10) / 10 - 0.02);
+  // Headroom above 100%: without it the many genes at exactly 100% sit on the
+  // top edge, half-clipped and overlapping the quadrant captions.
+  const yHi = 1 + 0.09 * (1 - yLo);
+  const py = s => padT + plotH - ((s - yLo) / (yHi - yLo)) * plotH;
+  const maxE = Math.max(...pts.map(g => g.emergence));
+  const rOf = g => 3 + 5 * Math.sqrt(g.emergence / maxE);
+
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img",
+    "aria-label": `${pts.length} emerging genes plotted by total PubMed footprint ` +
+      `(horizontal) against the share of their lupus papers published since ` +
+      `${m.recent_cutoff} (vertical)` });
+
+  for (let d = lo; d <= hi; d++) {
+    svg.append(svgEl("line", { class: "gridline", x1: px(10 ** d), x2: px(10 ** d), y1: padT, y2: padT + plotH }));
+    svg.append(svgEl("text", { class: "tick-label", x: px(10 ** d), y: H - 26, "text-anchor": "middle" },
+      d >= 6 ? `${10 ** (d - 6)}M` : d >= 3 ? `${10 ** (d - 3)}k` : String(10 ** d)));
+  }
+  for (let pct = Math.ceil(yLo * 10) * 10; pct <= 100; pct += 10) {
+    const y = py(pct / 100);
+    svg.append(svgEl("line", { class: "gridline", x1: padL, x2: W - padR, y1: y, y2: y }));
+    svg.append(svgEl("text", { class: "tick-label", x: padL - 6, y: y + 3.5, "text-anchor": "end" },
+      `${pct}%`));
+  }
+  svg.append(svgEl("text", { class: "axis-label", x: padL + plotW / 2, y: H - 8, "text-anchor": "middle" },
+    "Total PubMed papers on this gene, all of biology →"));
+  svg.append(svgEl("text", { class: "axis-label", "text-anchor": "middle",
+    transform: `rotate(-90 12 ${padT + plotH / 2})`, x: 12, y: padT + plotH / 2 },
+    `↑ Share of its lupus papers published since ${m.recent_cutoff}`));
+
+  // The two splits, and the corpus baseline they sit above.
+  const splitX = px(m.maturity_split), splitY = py(m.novelty_split);
+  svg.append(svgEl("line", { class: "split-rule", x1: splitX, x2: splitX, y1: padT, y2: padT + plotH }));
+  svg.append(svgEl("line", { class: "split-rule", x1: padL, x2: W - padR, y1: splitY, y2: splitY }));
+  for (const q of m.quadrants) {
+    const x = q.mature ? W - padR - 8 : padL + 8;
+    const y = q.novel ? padT + 11 : padT + plotH - 8;
+    svg.append(svgEl("text", { class: "quadrant-label", x, y,
+      "text-anchor": q.mature ? "end" : "start", fill: QUADRANT_COLORS[q.id] }, q.label));
+  }
+
+  // Dots first, then labels, so no label is buried under a later dot.
+  const placed = [];
+  const byEmergence = [...pts].sort((a, b) => b.emergence - a.emergence);
+  for (const g of byEmergence) {
+    const cx = px(g.pubmed_total), cy = py(g.recent_share);
+    const dot = svgEl("circle", { class: "scatter-dot", cx, cy, r: rOf(g),
+      fill: QUADRANT_COLORS[g.quadrant] || "var(--muted)",
+      opacity: g.unverified ? 0.35 : 0.75 });
+    dot.addEventListener("pointermove", ev =>
+      showTooltip(ev.clientX, ev.clientY, `${g.symbol} — ${g.name}`, [
+        { value: `${Math.round(g.recent_share * 100)}%`,
+          label: `of its ${g.papers} lupus papers are from ${m.recent_cutoff}–${m.complete_year}`,
+          color: QUADRANT_COLORS[g.quadrant] },
+        { value: fmt(g.pubmed_total), label: "papers on this gene in all of PubMed" },
+        { value: g.emergence.toFixed(1), label: "emergence (0–100)" },
+        { value: String(g.debut), label: "first lupus paper" },
+      ]));
+    dot.addEventListener("pointerleave", hideTooltip);
+    dot.addEventListener("click", () => showEmergingDetail(g.symbol));
+    svg.append(dot);
+  }
+  for (const g of byEmergence) {
+    if (placed.length >= 14) break;
+    const cx = px(g.pubmed_total), cy = py(g.recent_share);
+    const lx = cx + rOf(g) + 4, ly = cy + 3.5;
+    if (lx > W - padR - 30) continue;
+    if (placed.some(p => Math.abs(p.x - lx) < 46 && Math.abs(p.y - ly) < 11)) continue;
+    placed.push({ x: lx, y: ly });
+    svg.append(svgEl("text", { class: "scatter-label", x: lx, y: ly }, g.symbol));
+  }
+  return el("div", { class: "chart-box" }, svg);
+}
+
+function renderEmergingView() {
+  const view = document.getElementById("view-emerging");
+  const m = state.emergingMeta;
+  const search = el("input", { type: "search", placeholder: "Search gene symbol or name…",
+    value: emergingFilter.q,
+    oninput: e => { emergingFilter.q = e.target.value; renderEmergingBody(); } });
+  const quadSelect = el("select", { "aria-label": "Quadrant",
+    onchange: e => { emergingFilter.quadrant = e.target.value; renderEmergingBody(); } },
+    ...[["all", "All four quadrants"], ...m.quadrants.map(q => [q.id, q.label])]
+      .map(([v, text]) => {
+        const o = el("option", { value: v }, text);
+        if (emergingFilter.quadrant === v) o.selected = true;
+        return o;
+      }));
+  const check = (key, label, title) => {
+    const box = el("input", { type: "checkbox",
+      onchange: e => { emergingFilter[key] = e.target.checked; renderEmergingBody(); } });
+    box.checked = emergingFilter[key];
+    return el("label", { class: "check", title }, box, label);
+  };
+  const brandNew = state.emerging.filter(g => g.debut >= m.recent_cutoff).length;
+  const borrowed = state.emerging.filter(g => g.quadrant === "borrowed").length;
+
+  view.replaceChildren(
+    el("div", { class: "card intro-card" },
+      el("h2", {}, "Emerging genes"),
+      el("p", {},
+        "The leaderboard score is built from how many lupus papers a gene has and " +
+        "how strong its curated evidence is. Both grow with accumulated attention, " +
+        "so a gene whose entire lupus literature is four years old cannot rank there " +
+        "however fast it is moving. This tab selects on the opposite property: ",
+        el("strong", {}, "how improbably recent a gene's lupus literature is."),
+        " Only genes with at most " + fmt(m.max_papers) + " lupus papers are eligible — " +
+        "the point is the ones the field has not caught up with yet."),
+      el("p", { class: "sub" },
+        `About ${Math.round(m.corpus_recent_share * 100)}% of the whole lupus corpus was ` +
+        `published between ${m.recent_cutoff} and ${m.complete_year}. A gene qualifies ` +
+        "when its own share would be improbable at " + `p < ${m.p_threshold}` +
+        " had its papers simply fallen where the corpus fell — a binomial tail " +
+        "probability against that baseline."),
+      el("p", { class: "sub" },
+        "That test is the gate, not the ranking. Statistical power grows with sample " +
+        "size, so ranking on it would put the best-published genes on top — which is " +
+        "the opposite of the question. The ", el("strong", {}, "emergence score"),
+        " is the effect size instead: the recent share, shrunk for how few papers it " +
+        "rests on (a Wilson score lower bound). A gene with 18 of 19 papers in the " +
+        "window beats one with 66 of 107, and 5 of 5 does not beat either."),
+      el("p", { class: "sub" },
+        "This is a map of where attention is moving, not a ranked list of things to work " +
+        "on. A gene here has, by construction, thin evidence — that is what makes it new. " +
+        "The ",
+        el("button", { class: "linklike", onclick: () => switchView("targets") },
+          "Target opportunities"),
+        " tab asks the second question, and gates hard on evidence when it does."),
+      el("p", { class: "sub" },
+        "PubTator resolves gene synonyms, so a gene whose alias is also a trending " +
+        "acronym inherits that acronym's papers — in a literature this small, one " +
+        "collision is enough to manufacture a top-ranked gene. Every gene is checked " +
+        "against an independent keyword search of the same corpus and flagged when the " +
+        "two disagree; " + (m.excluded.length ? m.excluded.length : "no") +
+        " confirmed collisions are excluded outright" +
+        (m.excluded.length ? " — " + m.excluded.map(e => e.symbol).join(", ") : "") + ".")),
+    el("div", { class: "kpi-row" },
+      statTile("Emerging genes", fmt(state.emerging.length),
+        `p < ${m.p_threshold}, at most ${fmt(m.max_papers)} lupus papers`),
+      statTile("New to lupus", fmt(brandNew),
+        `first lupus paper in ${m.recent_cutoff} or later`),
+      statTile("Borrowed biology", fmt(borrowed),
+        `well studied elsewhere, new here`),
+      statTile("Top", state.emerging[0] ? state.emerging[0].symbol : "—",
+        state.emerging[0]
+          ? `emergence ${state.emerging[0].emergence.toFixed(1)} · ` +
+            `${fmt(state.emerging[0].papers)} papers`
+          : "")),
+    el("div", { class: "card" },
+      el("h2", {}, "Two axes"),
+      el("p", { class: "sub" },
+        "Horizontally: how much biology as a whole has studied this gene, from its total " +
+        "PubMed footprint. Vertically: how much of its lupus literature is recent. The " +
+        "split lines sit at " + fmt(m.maturity_split) + " papers and " +
+        Math.round(m.novelty_split * 100) + "%. Every gene plotted is already above the " +
+        Math.round(m.corpus_recent_share * 100) + "% corpus average — that is the entry " +
+        "condition — so the vertical axis starts at the lowest gene rather than at zero. " +
+        "Dot size is emergence; faded dots are the ones whose mention counts an " +
+        "independent search did not corroborate. Click any gene."),
+      el("div", { class: "legend quadrant-legend", id: "emerging-legend" }),
+      el("div", { id: "emerging-chart" })),
+    el("div", { class: "filter-row" },
+      search, quadSelect,
+      check("newOnly", "New to lupus",
+        `No lupus paper before ${m.recent_cutoff}`),
+      check("openOnly", "No SLE drug",
+        "Genes with no drug or trial candidate against them in lupus"),
+      check("hideUnverified", "Hide unverified",
+        "Drop genes whose PubTator mention count an independent keyword search did not corroborate"),
+      el("span", { class: "count", id: "emerging-count" })),
+    el("div", { class: "card" },
+      el("div", { class: "table-scroll" },
+        el("table", { class: "data" },
+          el("thead", {}, el("tr", {},
+            el("th", { class: "num" }, "#"),
+            el("th", {}, "Gene"),
+            el("th", {}, "Emergence"),
+            el("th", {}, "Lupus papers"),
+            el("th", {}, "History"),
+            el("th", { class: "num" }, "PubMed"),
+            el("th", {}, "Quadrant"))),
+          el("tbody", { id: "emerging-tbody" })))),
   );
+  renderEmergingBody();
+}
+
+function renderEmergingBody() {
+  const m = state.emergingMeta;
+  const rows = emergingRows();
+  document.getElementById("emerging-count").textContent =
+    `${fmt(rows.length)} of ${fmt(state.emerging.length)} genes`;
+
+  const counts = {};
+  for (const g of state.emerging) counts[g.quadrant] = (counts[g.quadrant] || 0) + 1;
+  document.getElementById("emerging-legend").replaceChildren(
+    ...m.quadrants.map(q => {
+      const active = emergingFilter.quadrant === q.id;
+      const item = el("button", { class: `legend-btn${active ? " active" : ""}`,
+        title: q.blurb,
+        onclick: () => {
+          emergingFilter.quadrant = active ? "all" : q.id;
+          renderEmergingBody();
+        } },
+        el("span", { class: "swatch", style: `background:${QUADRANT_COLORS[q.id]}` }),
+        `${q.label} (${counts[q.id] || 0})`);
+      return item;
+    }));
+  document.getElementById("emerging-chart").replaceChildren(quadrantChart(rows));
+
+  const quadLabel = Object.fromEntries(m.quadrants.map(q => [q.id, q.label]));
+  const tbody = document.getElementById("emerging-tbody");
+  if (!rows.length) {
+    tbody.replaceChildren(el("tr", {}, el("td", { colspan: "7", class: "empty-state" },
+      el("p", {}, "No genes match these filters."),
+      el("button", { class: "back-btn", onclick: () => {
+        emergingFilter.q = "";
+        emergingFilter.quadrant = "all";
+        for (const k of ["newOnly", "openOnly", "hideUnverified"]) emergingFilter[k] = false;
+        renderEmergingView();
+      } }, "Clear filters"))));
+    return;
+  }
+  tbody.replaceChildren(...rows.map(g => el("tr", { class: "gene-row", tabindex: "0", role: "button",
+    onclick: () => showEmergingDetail(g.symbol),
+    onkeydown: ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); showEmergingDetail(g.symbol); } } },
+    el("td", { class: "num muted" }, String(g.rank)),
+    el("td", {},
+      el("div", { class: "gene-symbol" }, g.symbol),
+      el("div", { class: "gene-name" }, g.name),
+      (g.drug_stage || g.unverified)
+        ? el("div", { class: "flag-row" }, drugBadge(g),
+            g.unverified ? corroborationNote(g) : null)
+        : null),
+    el("td", {}, el("div", { class: "score-cell" },
+      el("div", { class: "bar-track" },
+        el("div", { class: "bar-fill",
+          style: `width:${g.emergence}%;` +
+                 `background:${QUADRANT_COLORS[g.quadrant] || "var(--muted)"}` })),
+      el("span", { class: "val" }, g.emergence.toFixed(1)))),
+    el("td", { class: "muted" },
+      `${fmt(g.recent_papers)} of ${fmt(g.papers)}`,
+      el("div", { class: "cell-sub" }, `${Math.round(g.recent_share * 100)}% since ${m.recent_cutoff}`)),
+    el("td", {}, el("div", { class: "trend-cell" },
+      el("div", { class: "spark-gap" }, sparkline(g)),
+      el("span", { class: "trend-tag" }, `first seen ${g.debut}`))),
+    el("td", { class: "num muted" }, g.pubmed_total == null ? "—" : fmt(g.pubmed_total)),
+    el("td", {}, el("span", { class: "badge quadrant-badge",
+      style: `border-color:${QUADRANT_COLORS[g.quadrant] || "var(--muted)"};` +
+             `color:${QUADRANT_COLORS[g.quadrant] || "var(--muted)"}` },
+      quadLabel[g.quadrant] || "unplaced")))));
+}
+
+function showEmergingDetail(symbol) {
+  const g = state.emerging.find(x => x.symbol === symbol);
+  if (!g) return;
+  setHash({ emerging: symbol });
+  const m = state.emergingMeta;
+  const quad = m.quadrants.find(q => q.id === g.quadrant);
+  const inLeaderboard = state.geneBySymbol.has(g.symbol);
+  const target = state.targets.find(t => t.symbol === g.symbol);
+  const pre = g.papers - g.recent_papers;
+
+  // replaceChildren stringifies non-nodes, so a `null` branch would render the
+  // word "null" — unlike el(), which drops them.
+  document.getElementById("view-detail").replaceChildren(...[
+    el("button", { class: "back-btn", onclick: () => switchView("emerging") },
+      "← Back to emerging genes"),
+    el("div", { class: "detail-head" },
+      el("h2", {}, g.symbol),
+      el("span", { class: "muted" }, g.name),
+      corroborationNote(g),
+      el("a", { href: `https://www.ncbi.nlm.nih.gov/gene/${g.entrez}`,
+        target: "_blank", rel: "noopener" }, "NCBI Gene ↗"),
+      el("a", { href: `https://platform.opentargets.org/target/${g.symbol}`,
+        target: "_blank", rel: "noopener" }, "Open Targets ↗")),
+    el("div", { class: "kpi-row" },
+      statTile("Emergence", g.emergence.toFixed(1),
+        `out of 100 · rank #${g.rank} of ${fmt(state.emerging.length)}`),
+      statTile("Lupus papers", fmt(g.papers),
+        `${fmt(g.recent_papers)} since ${m.recent_cutoff} · ${fmt(pre)} before`),
+      statTile("First lupus paper", String(g.debut),
+        g.debut >= m.recent_cutoff
+          ? "nothing before the recent window"
+          : `${fmt(pre)} paper${pre === 1 ? "" : "s"} before ${m.recent_cutoff}`),
+      statTile("PubMed footprint", g.pubmed_total == null ? "—" : fmt(g.pubmed_total),
+        "papers on this gene across all of biology")),
+    quad
+      ? el("div", { class: "card" },
+          el("h2", {}, quad.label),
+          el("p", { class: "sub" }, quad.blurb),
+          el("p", { class: "sub" },
+            `${g.symbol} sits here because ${Math.round(g.recent_share * 100)}% of its ` +
+            `lupus papers are from ${m.recent_cutoff} or later (the split is ` +
+            `${Math.round(m.novelty_split * 100)}%), and PubMed holds ` +
+            `${fmt(g.pubmed_total)} papers on it overall (the split is ` +
+            `${fmt(m.maturity_split)}).`))
+      : null,
+    el("div", { class: "card" },
+      el("h2", {}, "Lupus papers per year"),
+      el("p", { class: "sub" },
+        `PubTator gene mentions across the lupus corpus. ${m.max_year} is still in ` +
+        "progress and is excluded from the statistics above."),
+      yearColumnChart(g.year_counts, { label: `${g.symbol} lupus papers per year` })),
+    el("div", { class: "card" },
+      el("h2", {}, "Why this counts as emerging"),
+      el("p", { class: "sub" },
+        `${Math.round(m.corpus_recent_share * 100)}% of the lupus corpus was published ` +
+        `between ${m.recent_cutoff} and ${m.complete_year}. If ${g.symbol}'s ` +
+        `${fmt(g.papers)} papers had landed in those years at the same rate, about ` +
+        `${Math.round(g.papers * m.corpus_recent_share)} would be recent. ` +
+        `${fmt(g.recent_papers)} are. The chance of that happening by accident is about ` +
+        (g.surprise >= 5 ? "1 in 10" + supers(Math.round(g.surprise))
+                         : `1 in ${fmt(Math.round(10 ** g.surprise))}`) + "."),
+      el("p", { class: "sub" },
+        `That test decides whether ${g.symbol} belongs here at all. Its position in the ` +
+        `list comes from the effect size: ${fmt(g.recent_papers)} of ${fmt(g.papers)} is ` +
+        `${Math.round(g.recent_share * 100)}%, which ${fmt(g.papers)} papers support down ` +
+        `to ${g.emergence.toFixed(1)}% with 95% confidence — that lower bound is the ` +
+        "emergence score, so a large share resting on very few papers cannot run away " +
+        "with the ranking."),
+      g.corroboration != null
+        ? el("p", { class: "sub" },
+            `Cross-check: searching PubMed's own index for "${g.symbol}"` +
+            ((g.aliases || []).length ? ` or its aliases (${g.aliases.join(", ")})` : "") +
+            ` inside the same lupus corpus returns ${fmt(g.pubmed_lupus)} papers, against ` +
+            `PubTator's ${fmt(g.papers)} mentions — a ratio of ${g.corroboration}×. ` +
+            (g.unverified
+              ? "That is outside the expected range, so treat the mention count with " +
+                "suspicion: PubTator may be resolving an ambiguous alias onto this gene."
+              : "The two independent counts agree, so the mentions look real."))
+        : null),
+    g.articles.length
+      ? el("div", { class: "card" },
+          el("h2", {}, "The recent papers"),
+          el("p", { class: "sub" },
+            `The ${g.articles.length} most recent lupus papers mentioning ${g.symbol} — ` +
+            "the fastest way to judge for yourself whether this is a real signal."),
+          el("ul", { class: "article-list" },
+            ...g.articles.map(a => el("li", {},
+              el("a", { href: `https://pubmed.ncbi.nlm.nih.gov/${a.pmid}/`,
+                target: "_blank", rel: "noopener" }, a.title || `PMID ${a.pmid}`),
+              el("div", { class: "muted" }, `${a.journal || "—"} · ${a.year || "—"}`)))))
+      : null,
+    (g.drugs || []).length ? drugCard(g) : null,
+    el("div", { class: "card" },
+      el("h2", {}, "Elsewhere on this site"),
+      el("p", { class: "sub" },
+        `Open Targets scores ${g.symbol}'s SLE association at ${g.ot_score.toFixed(2)}. ` +
+        (g.lit_rank
+          ? `It also ranks #${g.lit_rank} on the literature leaderboard.`
+          : `It ranks outside the published top ${fmt(state.meta.genes_shown)} on the ` +
+            "leaderboard — which is the point of this tab.")),
+      el("div", { class: "detail-links" },
+        inLeaderboard
+          ? el("button", { class: "back-btn", onclick: () => showDetail(g.symbol) },
+              `Literature page for ${g.symbol} →`)
+          : null,
+        target
+          ? el("button", { class: "back-btn", onclick: () => showTargetDetail(g.symbol) },
+              `Target opportunity score for ${g.symbol} →`)
+          : null,
+        el("a", { class: "back-btn",
+          href: `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(`(${g.symbol}) AND (lupus)`)}&sort=date`,
+          target: "_blank", rel: "noopener" }, "Search PubMed ↗"))),
+  ].filter(Boolean));
   switchView("detail", { keepHash: true });
   window.scrollTo({ top: 0 });
 }
@@ -1704,12 +2149,13 @@ function switchView(name, { keepHash } = {}) {
     tab.classList.toggle("active", active);
     tab.setAttribute("aria-selected", String(active));
   }
-  for (const v of ["genes", "targets", "pathways", "compare", "about", "detail"]) {
+  for (const v of ["genes", "targets", "emerging", "pathways", "compare", "about", "detail"]) {
     document.getElementById(`view-${v}`).hidden = v !== name;
   }
   if (!keepHash) setHash();   // drops #gene= but preserves any custom weighting
   if (name === "genes") renderGenesView();
   if (name === "targets") renderTargetsView();
+  if (name === "emerging") renderEmergingView();
   if (name === "pathways") renderPathwaysView();
   if (name === "compare") renderCompareView();
   if (name === "about") renderAboutView();
@@ -1725,8 +2171,9 @@ async function boot() {
       })));
   // Target scoring is a separate pipeline step; the dashboard still works
   // without it, so a missing file hides the tab rather than breaking the page.
-  const targets = await fetch("data/targets.json")
-    .then(r => (r.ok ? r.json() : null)).catch(() => null);
+  const [targets, emerging] = await Promise.all(
+    ["targets", "emerging"].map(name => fetch(`data/${name}.json`)
+      .then(r => (r.ok ? r.json() : null)).catch(() => null)));
   state.genes = genes.genes;
   state.meta = meta;
   state.pathways = pathways.pathways;
@@ -1748,6 +2195,14 @@ async function boot() {
     targetsTab.remove();
   }
 
+  const emergingTab = document.querySelector('.tab[data-view="emerging"]');
+  if (emerging && emerging.genes.length) {
+    state.emerging = emerging.genes;
+    state.emergingMeta = emerging;
+  } else if (emergingTab) {
+    emergingTab.remove();
+  }
+
   document.getElementById("loading").remove();
   document.getElementById("provenance").textContent =
     `Last updated ${meta.updated} · ${fmt(meta.corpus_articles)} articles · query: ${meta.query}`;
@@ -1758,7 +2213,9 @@ async function boot() {
   const params = new URLSearchParams(location.hash.slice(1));
   const hashGene = params.get("gene");
   const hashTarget = params.get("target");
+  const hashEmerging = params.get("emerging");
   if (hashTarget && state.targetRanked.some(t => t.symbol === hashTarget)) showTargetDetail(hashTarget);
+  else if (hashEmerging && state.emerging.some(g => g.symbol === hashEmerging)) showEmergingDetail(hashEmerging);
   else if (hashGene && state.ranked.some(g => g.symbol === hashGene)) showDetail(hashGene);
   else switchView("genes");
 }

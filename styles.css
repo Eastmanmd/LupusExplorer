@@ -12,6 +12,7 @@
   --series-1: #2a78d6;   /* blue   — primary / GO:BP */
   --series-2: #eb6834;   /* orange — KEGG */
   --series-3: #1baf7a;   /* aqua   — Reactome */
+  --series-4: #6b4fd8;   /* purple — 4th categorical, emerging quadrants */
   --seq-150: #b7d3f6;    /* light sequential steps for score bars */
   --seq-250: #86b6ef;
   --seq-450: #2a78d6;
@@ -43,6 +44,7 @@
     --series-1: #3987e5;
     --series-2: #d95926;
     --series-3: #199e70;
+    --series-4: #9085e9;
     --seq-150: #184f95;
     --seq-250: #1c5cab;
     --seq-450: #3987e5;
@@ -398,3 +400,34 @@ tr.gene-row:hover td, tr.gene-row:focus-within td { background: var(--wash); }
   .pillar-summary-row { grid-template-columns: 110px 1fr 50px; }
   .criterion-meta { flex-direction: column; gap: 2px; }
 }
+
+/* ---- emerging genes ---- */
+.split-rule { stroke: var(--baseline); stroke-width: 1; stroke-dasharray: 4 4; }
+.quadrant-label { font-size: 12px; font-weight: 600; opacity: 0.85; }
+.scatter-dot { cursor: pointer; }
+.scatter-dot:hover { stroke: var(--ink); stroke-width: 1.5; opacity: 1; }
+.scatter-label { fill: var(--ink-2); font-size: 10.5px; pointer-events: none; }
+.quadrant-legend { gap: 8px; margin: 6px 0 10px; }
+.legend-btn {
+  all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px;
+  font-size: 12.5px; color: var(--ink-2);
+}
+.legend-btn:hover { background: var(--wash); color: var(--ink); }
+.legend-btn.active { border-color: var(--ink-2); color: var(--ink); font-weight: 600; }
+.badge.quadrant-badge { font-weight: 600; white-space: nowrap; }
+.badge.verified { border-color: var(--border); color: var(--muted); }
+.badge.unverified { border-color: var(--series-2); color: var(--series-2); cursor: default; }
+.table-scroll { overflow-x: auto; }
+.table-scroll table.data { min-width: 780px; }
+.cell-sub { color: var(--ink-2); font-size: 12.5px; margin-top: 2px; }
+.article-list { list-style: none; margin: 0; padding: 0; }
+.article-list li { padding: 7px 0; border-top: 1px solid var(--grid); font-size: 13.5px; }
+.article-list li:first-child { border-top: none; }
+.article-list .muted { font-size: 12.5px; margin-top: 2px; }
+.detail-links { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+.detail-links .back-btn { margin-bottom: 0; }
+.linklike {
+  all: unset; cursor: pointer; color: var(--series-1);
+}
+.linklike:hover { text-decoration: underline; }
