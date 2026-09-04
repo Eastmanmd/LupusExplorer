@@ -146,3 +146,38 @@ SPECIFICITY_FILE = os.path.join(CACHE_DIR, "specificity.json")
 EMERGING_FILE = os.path.join(DATA_DIR, "emerging.json")
 NETWORK_FILE = os.path.join(DATA_DIR, "network.json")
 NETWORK_MODULES_FILE = os.path.join(CACHE_DIR, "network_modules.json")
+
+# --- APOL1 tracker ----------------------------------------------------------
+# APOL1 is invisible to every other tab by construction: 40 lupus papers puts it
+# far outside the top-300 leaderboard and network node sets, its Open Targets
+# SLE association is 0.06, and its papers are spread evenly over 2012-2026 so it
+# fails the emerging-gene concentration test. The biology is real anyway — the
+# G1/G2 risk genotypes drive progression to ESKD in lupus nephritis — so it gets
+# a tab of its own rather than a scoring exemption somewhere else.
+APOL1_ENTREZ = "8542"
+# Deliberately wider than the lupus corpus. Only ~49 papers sit in the
+# intersection, and 28 of those 40 that PubTator tags mention APOL1 and no other
+# gene, so a graph built on the intersection alone is a picture of two abstracts
+# (see the two-ring note below). The full APOL1 literature supplies the second
+# ring; membership in the lupus corpus is what the rings distinguish.
+APOL1_QUERY = 'APOL1[tiab] OR "apolipoprotein L1"[tiab] OR APOL1[All Fields]'
+
+# Table: a partner gene needs this many co-mentions with APOL1 anywhere in the
+# APOL1 corpus to be listed at all. 1 would admit every gene named once in
+# passing in any of 1,300 papers.
+APOL1_TABLE_MIN_CO = 1          # lupus ring: every intersection partner counts
+APOL1_OUTER_MIN_CO = 3          # outer ring is big, so it has to earn its place
+APOL1_OUTER_MAX = 70            # cap on outer-ring nodes, by weighted strength
+
+# Lupus co-mentions count for this many ordinary APOL1 co-mentions when edges
+# are weighted and when the outer ring is truncated. The tab's question is
+# "what does APOL1 biology look like from lupus", so a pair seen once in a
+# lupus paper should outrank a pair seen twice in unrelated nephrology.
+APOL1_LUPUS_EDGE_WEIGHT = 4.0
+APOL1_PARTNER_MIN_CO = 2        # partner-partner edge needs this many papers
+APOL1_PARTNER_P = 1e-4          # hypergeometric gate on partner-partner edges
+
+APOL1_PMIDS_FILE = os.path.join(CACHE_DIR, "apol1_pmids.txt")
+APOL1_MENTIONS_FILE = os.path.join(CACHE_DIR, "apol1_mentions.jsonl")
+APOL1_FILE = os.path.join(DATA_DIR, "apol1.json")
+APOL1_MODULES_FILE = os.path.join(CACHE_DIR, "apol1_modules.json")

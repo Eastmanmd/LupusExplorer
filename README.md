@@ -295,6 +295,102 @@ disagreements between the two are the point.
 co-mentions, 88% of them recent — and it is entirely an artefact of PubTator
 resolving "CAR" in CAR-T papers onto the constitutive androstane receptor.
 
+## APOL1 in lupus
+
+APOL1 carries two coding variants — **G1** and **G2** — that arose under
+selection for resistance to trypanosomes and now, in two copies, drive
+progression to kidney failure in people of recent African ancestry. Lupus
+nephritis is one of the diseases they act on.
+
+Every other tab here is structurally incapable of surfacing that:
+
+| | APOL1 | what it needs |
+|---|---|---|
+| Leaderboard | 40 lupus papers | top 300 by paper count |
+| Co-mention network | 40 lupus papers | top 300 by paper count |
+| Target opportunities | Open Targets SLE association 0.06 | credible evidence |
+| Emerging genes | papers spread evenly 2012–2026 | improbable recent concentration |
+
+So it gets a tab rather than a scoring exemption somewhere else. The tab is
+there because the biology is real, not because APOL1 scored well.
+
+### Two corpora, and why
+
+The **table** answers the narrow question — which genes does the lupus
+literature name alongside APOL1 — and is built only from lupus papers.
+
+The **map** cannot be. Of the 40 lupus papers PubTator tags with APOL1, **28
+name APOL1 and no other gene**. That leaves 24 partners, 20 of them seen once,
+and exactly one partner–partner edge above weight 1. Run through the co-mention
+map's own thresholds (`NETWORK_MIN_CO = 4`, *p* < 1e-6) a single edge survives:
+APOL1–MYH9. A graph on that is a picture of two abstracts wearing a network's
+clothes.
+
+`pipeline/fetch_apol1.py` therefore fetches a second, small corpus — the whole
+APOL1 literature, ~1,300 papers — into `cache/apol1_mentions.jsonl`. It reuses
+anything `cache/mentions.jsonl` already annotated and never writes to it.
+
+### Three counts, and the one that matters
+
+The table ships all three and sorts on any of them, defaulting to the share:
+
+| gene | papers with APOL1 | its total lupus papers | share |
+|---|---|---|---|
+| MYH9 | 4 | 7 | **57.1%** |
+| IFNA1 | 2 | 1,346 | **0.1%** |
+
+Raw co-mentions put these two within a factor of two of each other. The share
+does not, and the share is right: MYH9 is an APOL1 partner — same haplotype
+block, the pre-APOL1 candidate gene — while IFNA1 co-occurs with everything.
+
+A share of 100% can also mean "the only lupus paper naming this gene also named
+APOL1". APOL3 and APOL4 are exactly that, and they are neighbouring genes on the
+same locus picked up by one re-sequencing paper. Ties break on the lower bound
+of a 95% confidence interval on the share — the same device
+`build_emerging.py` uses for its emergence score — so 2-of-2 cannot outrank
+4-of-7. The displayed number stays the raw one. Read the denominator.
+
+### Two rings
+
+APOL1 sits at the centre. The **inner ring** is the genes a lupus paper has
+already co-mentioned with it. The **outer ring** is the strongest partners from
+the wider APOL1 literature that no lupus paper has — drawn hollow, because the
+connection is established elsewhere and untested here.
+
+Structure comes from the wide corpus; the weighting stays anchored to lupus. A
+co-mention inside a lupus paper counts for `APOL1_LUPUS_EDGE_WEIGHT` ordinary
+ones, both when the pipeline picks which eligible partners make the outer ring
+and when an edge is drawn.
+
+Each wedge is a community found from the edges and named by g:Profiler, and it
+spans both rings, so **an empty inner arc inside a crowded outer wedge is the
+figure's actual claim**. As it stands: the cGAS/STING/IFI16/IRF3 wedge is
+entirely lupus-linked, while the high-density-lipoprotein wedge and the cytokine
+wedge are entirely lupus-unseen.
+
+Layout is radial and deterministic rather than a force simulation. When the ring
+a node sits on carries the whole meaning of the figure, a physics layout that
+pulled a lupus-linked gene outward would be lying. Wedge width is allocated by
+the arc length each ring actually needs, because the inner ring has two thirds
+of the outer one's circumference and splitting the circle by raw member count
+squeezes an inner-heavy module into an arc narrower than one gene label.
+
+### What this tab does not do
+
+PubTator does not annotate the variants. Checked directly against the BioC
+records for the APOL1 lupus papers — including ones titled "High-Risk
+Genotypes" — the annotation types returned are `Gene`, `Species` and `Disease`,
+with **no `Variant` or `Mutation` annotations at all**. These abstracts say
+"G1/G2 high-risk genotype", not rsIDs. Tracking G1 (rs73885319, rs60910145) and
+G2 (rs71785313) would need text matching over titles and abstracts, and bare
+`G1`/`G2` are also cell-cycle phases — an `ALIAS_COLLISIONS`-shaped problem that
+would need APOL1-proximity gating. Nothing here attempts it.
+
+Nor does it separate SLE from lupus nephritis. PubTator returns those as
+distinct diseases (`MESH:D008180` and `MESH:D008181`), but `fetch_pubtator.py`
+keeps only `type == "Gene"` annotations, so the mention caches do not carry
+them.
+
 ## Finding a drug target
 
 The leaderboard ranks **attention**. That is a useful thing to measure, but it

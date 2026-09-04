@@ -17,6 +17,12 @@ STEPS = [
                            # fetch_specificity.py knows whose footprint to get
     "build_network.py",    # gene co-mention graph, straight off the mentions
                            # cache; independent of everything below
+    "fetch_apol1.py",      # second, small corpus: the whole APOL1 literature.
+                           # Reuses anything the lupus corpus already annotated
+                           # and never writes to cache/mentions.jsonl.
+    "build_apol1.py",      # APOL1 partner table + two-ring map. Needs only the
+                           # two mention caches, so it sits here rather than
+                           # below with the Open Targets steps.
     # Drug-target scoring. Everything below needs the ranked gene list from
     # build_data.py, so it runs after the leaderboard is settled.
     "fetch_target_profile.py",  # tractability, constraint, essentiality, PPI

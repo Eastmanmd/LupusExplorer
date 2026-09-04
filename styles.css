@@ -477,3 +477,35 @@ tr.gene-row:hover td, tr.gene-row:focus-within td { background: var(--wash); }
 .module-members .chip { font-size: 11.5px; padding: 1px 7px; }
 td .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px;
   vertical-align: -1px; margin-right: 6px; }
+
+/* --- APOL1 tab ------------------------------------------------------------ */
+/* Sortable column headers. Only the three count columns are sortable, so the
+   affordance has to be visible without shouting at the two that are not. */
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable:hover { color: var(--ink); }
+th.sortable:focus-visible { outline: 2px solid var(--ink-2); outline-offset: -2px; }
+th.sortable.sorted { color: var(--ink); font-weight: 600; }
+.sort-caret { margin-left: 5px; font-size: 11px; color: var(--muted); }
+th.sortable.sorted .sort-caret { color: var(--ink-2); }
+
+.apol1-table td.num { font-variant-numeric: tabular-nums; }
+.apol1-table tr.inert { cursor: default; }
+.apol1-table tr.is-focus { background: var(--wash); }
+
+.apol1-svg { max-height: 78vh; }
+.apol1-ring { pointer-events: none; }
+.apol1-ring-label,
+.apol1-gene-label,
+.apol1-hub-label { pointer-events: none; }
+.apol1-ring-label { fill: var(--muted); font-size: 10.5px; letter-spacing: 0.02em; }
+.apol1-gene-label { fill: var(--muted); font-size: 9.5px; }
+.apol1-gene-label.is-lupus { fill: var(--ink-2); font-size: 10.5px; font-weight: 600; }
+.apol1-hub-label { fill: var(--ink); font-size: 13px; font-weight: 700; }
+
+/* The filled/hollow distinction carries the whole two-ring reading, so the
+   legend has to show it rather than name it. */
+.swatch.apol1-key-inner { background: var(--ink-2); }
+.swatch.apol1-key-outer {
+  background: var(--surface); border: 1.6px solid var(--ink-2); box-sizing: border-box;
+}
+.apol1-focus-slot { margin-left: auto; }

@@ -24,6 +24,7 @@ const state = {
   emergingMeta: null,   // baseline, splits and quadrant definitions
   network: null,        // co-mention graph: nodes with layout, edges, modules
   networkBySymbol: new Map(),
+  apol1: null,          // APOL1 partner table + two-ring co-mention map
 };
 
 const WEIGHT_KEYS = ["mentions", "recency", "opentargets"];
@@ -2635,6 +2636,421 @@ function showNetworkDetail(symbol) {
   window.scrollTo({ top: 0 });
 }
 
+/* ---------- APOL1 in lupus ---------- */
+/* Two questions, one tab. The table is the narrow one — which genes does the
+   lupus literature name alongside APOL1 — and is built only from lupus papers.
+   The map is the wide one, because the narrow answer cannot be drawn: 28 of the
+   40 lupus papers PubTator tags with APOL1 name no other gene. So the map runs
+   on the whole APOL1 corpus and splits it into two rings, lupus-linked inside
+   and lupus-unseen outside. See pipeline/build_apol1.py. */
+const APOL1_SORTS = {
+  share:        { label: "Share of its lupus lit", get: r => r.share,
+                  tie: r => [r.share_lb, r.co_lupus] },
+  co_lupus:     { label: "Papers with APOL1", get: r => r.co_lupus,
+                  tie: r => [r.share, r.share_lb] },
+  lupus_papers: { label: "Its total lupus papers", get: r => r.lupus_papers,
+                  tie: r => [r.share, r.co_lupus] },
+};
+/* Two kinds of highlight, because they behave differently: `focus` is sticky
+   and set by clicking a gene on the map, `hover` is transient and set by
+   passing over a table row. Only the sticky one earns a way out of it. */
+const apol1Filter = { sort: "share", dir: "desc", showOuter: true,
+                      showSpokes: true, allLabels: false, focus: null, hover: null };
+
+function apol1ModuleColour(moduleId) {
+  const mod = (state.apol1.network.modules || [])[moduleId];
+  if (!mod || !mod.coloured || mod.unclustered) return "var(--muted)";
+  return `var(${MODULE_VARS[moduleId % MODULE_VARS.length]})`;
+}
+
+function apol1SortedRows() {
+  const { sort, dir } = apol1Filter;
+  const spec = APOL1_SORTS[sort];
+  const sign = dir === "desc" ? -1 : 1;
+  return [...state.apol1.rows].sort((a, b) => {
+    const primary = sign * (spec.get(a) - spec.get(b));
+    if (primary) return primary;
+    // Ties break on the other metrics before falling back to the symbol, so
+    // two genes at 100% do not land in alphabetical order — the Wilson bound
+    // shipped with the row is what separates 2-of-2 from 4-of-7.
+    const ta = spec.tie(a), tb = spec.tie(b);
+    for (let i = 0; i < ta.length; i++) if (ta[i] !== tb[i]) return sign * (ta[i] - tb[i]);
+    return a.symbol.localeCompare(b.symbol);
+  });
+}
+
+/* The rings are radial and the angle is not decoration: each module owns a
+   wedge spanning both rings, so an empty inner arc inside a crowded outer one
+   is the gap the tab is about. Layout is precomputed in the pipeline for the
+   same reason the co-mention map's is — a picture that reshuffles cannot be
+   learned. */
+function apol1Map() {
+  const net = state.apol1.network;
+  const nodes = net.nodes;
+  const focus = apol1Filter.hover || apol1Filter.focus;
+  // Asymmetric: wedge captions are horizontal text hung off the outer ring, so
+  // the box needs room for a caption's width on the sides and only a node
+  // radius at the top and bottom.
+  const padX = 176, padY = 64;
+  const counts = nodes.map(n => n.co_apol1);
+  const logMin = Math.log(Math.min(...counts)), logMax = Math.log(Math.max(...counts));
+  const radius = n => n.ring === "hub" ? 13
+    : 3.2 + 6.8 * ((Math.log(n.co_apol1) - logMin) / (logMax - logMin || 1));
+  // A lupus co-mention counts for `lupus_weight` ordinary ones everywhere in
+  // this figure, exactly as it does when the pipeline picks the outer ring.
+  const weight = (co, lupus) => (co - lupus) + lupus * state.apol1.lupus_weight;
+
+  const visible = i => apol1Filter.showOuter || nodes[i].ring !== "apol1";
+  const adjacency = new Map();
+  for (const [a, b] of net.edges) {
+    if (!adjacency.has(a)) adjacency.set(a, new Set());
+    if (!adjacency.has(b)) adjacency.set(b, new Set());
+    adjacency.get(a).add(b);
+    adjacency.get(b).add(a);
+  }
+  const focusIndex = focus == null ? null : nodes.findIndex(n => n.symbol === focus);
+  const lit = focusIndex == null ? null
+    : new Set([focusIndex, ...(adjacency.get(focusIndex) || [])]);
+
+  const svg = svgEl("svg", {
+    viewBox: `${-padX} ${-padY} ${net.width + 2 * padX} ${net.height + 2 * padY}`,
+    class: "network-svg apol1-svg", role: "img", "aria-label":
+      `APOL1 co-mention rings: ${nodes.filter(n => n.ring === "lupus").length} genes the ` +
+      `lupus literature connects to APOL1 on the inner ring, ` +
+      `${nodes.filter(n => n.ring === "apol1").length} connected only in the wider ` +
+      "APOL1 literature on the outer ring" });
+
+  // Wedges are laid out clockwise from the top, and the lupus-linked ring runs
+  // out of members well before the circle closes, so its lower-left arc is
+  // reliably empty — which is where its caption goes. The outer ring is full
+  // all the way round and takes its caption outside the dashes instead.
+  for (const [r, label, angle, inset] of [[net.r_inner, "lupus-linked", 2.53, -18],
+                                          [net.r_outer, "APOL1 literature only", -1.571, -13]]) {
+    if (r === net.r_outer && !apol1Filter.showOuter) continue;
+    svg.append(svgEl("circle", { class: "apol1-ring", cx: net.cx, cy: net.cy, r,
+      fill: "none", stroke: "var(--grid)", "stroke-width": 1,
+      "stroke-dasharray": r === net.r_outer ? "3 5" : "none" }));
+    svg.append(svgEl("text", { class: "apol1-ring-label",
+      x: (net.cx + (r + inset) * Math.cos(angle)).toFixed(1),
+      y: (net.cy + (r + inset) * Math.sin(angle)).toFixed(1),
+      "text-anchor": "middle" }, label));
+  }
+
+  const edgeLayer = svgEl("g", { class: "edge-layer" });
+  for (const [a, b, co, lupus, spoke] of net.edges) {
+    if (!visible(a) || !visible(b)) continue;
+    if (spoke && !apol1Filter.showSpokes) continue;
+    const na = nodes[a], nb = nodes[b];
+    const inFocus = !lit || (lit.has(a) && lit.has(b));
+    const w = weight(co, lupus);
+    const line = svgEl("line", { class: "net-edge", x1: na.x, y1: na.y, x2: nb.x, y2: nb.y,
+      stroke: lupus ? "var(--series-2)" : "var(--baseline)",
+      "stroke-width": Math.min(4.5, (spoke ? 0.35 : 0.6) + 0.5 * Math.sqrt(w)).toFixed(2),
+      opacity: !inFocus ? 0.05 : lupus ? 0.8 : spoke ? 0.16 : 0.4 });
+    line.addEventListener("pointermove", ev =>
+      showTooltip(ev.clientX, ev.clientY, `${na.symbol} — ${nb.symbol}`, [
+        { value: fmt(co), label: co === 1 ? "APOL1 paper mentions both"
+                                          : "APOL1 papers mention both" },
+        { value: fmt(lupus), label: "of those are lupus papers",
+          color: lupus ? "var(--series-2)" : null },
+        { value: weight(co, lupus).toFixed(1),
+          label: `weighted (lupus papers count ${state.apol1.lupus_weight}×)` },
+      ]));
+    line.addEventListener("pointerleave", hideTooltip);
+    edgeLayer.append(line);
+  }
+  svg.append(edgeLayer);
+
+  const labelLayer = svgEl("g", { class: "apol1-gene-labels" });
+  const nodeLayer = svgEl("g", { class: "node-layer" });
+  nodes.forEach((n, i) => {
+    if (!visible(i)) return;
+    const inFocus = !lit || lit.has(i);
+    const colour = n.ring === "hub" ? "var(--ink)" : apol1ModuleColour(n.module);
+    const dot = svgEl("circle", { class: "net-node", cx: n.x, cy: n.y, r: radius(n),
+      // Filled means the lupus literature has already made the connection;
+      // hollow means only the wider APOL1 literature has.
+      fill: n.ring === "apol1" ? "var(--surface)" : colour,
+      stroke: colour, "stroke-width": n.ring === "apol1" ? 1.6 : 0.9,
+      opacity: inFocus ? 1 : 0.12 });
+    dot.addEventListener("pointermove", ev => {
+      const mod = net.modules[n.module];
+      showTooltip(ev.clientX, ev.clientY, `${n.symbol}${n.name ? ` — ${n.name}` : ""}`,
+        n.ring === "hub"
+          ? [{ value: fmt(n.co_apol1), label: "papers in the APOL1 corpus" },
+             { value: fmt(n.co_lupus), label: "of those are lupus papers",
+               color: "var(--series-2)" }]
+          : [{ value: fmt(n.co_apol1), label: "APOL1 papers mention it" },
+             { value: fmt(n.co_lupus), label: "of those are lupus papers",
+               color: n.co_lupus ? "var(--series-2)" : null },
+             { value: n.lupus_papers ? fmt(n.lupus_papers) : "—",
+               label: "its own lupus papers" },
+             { value: (mod && mod.label) || "unclustered",
+               label: mod ? `${mod.size} genes in this wedge` : "" }]);
+    });
+    dot.addEventListener("pointerleave", hideTooltip);
+    dot.addEventListener("click", () => {
+      apol1Filter.focus = apol1Filter.focus === n.symbol ? null : n.symbol;
+      renderApol1Body();
+    });
+    nodeLayer.append(dot);
+
+    const named = n.ring !== "apol1" || apol1Filter.allLabels;
+    if (!named || !inFocus) return;
+    if (n.ring === "hub") {
+      labelLayer.append(svgEl("text", { class: "apol1-hub-label", x: n.x,
+        y: n.y + radius(n) + 15, "text-anchor": "middle" }, n.symbol));
+      return;
+    }
+    const dx = n.x - net.cx, dy = n.y - net.cy;
+    const len = Math.hypot(dx, dy) || 1;
+    const off = radius(n) + 5 + (n.label_tier ? 14 : 0);
+    labelLayer.append(svgEl("text", {
+      class: `apol1-gene-label${n.ring === "lupus" ? " is-lupus" : ""}`,
+      x: (n.x + (dx / len) * off).toFixed(1), y: (n.y + (dy / len) * off + 3.2).toFixed(1),
+      "text-anchor": dx >= 0 ? "start" : "end" }, n.symbol));
+  });
+  svg.append(nodeLayer, labelLayer);
+
+  const captionLayer = svgEl("g", { class: "module-label-layer" });
+  for (const mod of net.modules) {
+    if (!mod.label || mod.size < 3 || mod.start == null) continue;
+    if (mod.unclustered && !apol1Filter.allLabels) continue;
+    const mid = (mod.start + mod.end) / 2;
+    const r = net.r_outer + 30;
+    const x = net.cx + r * Math.cos(mid), y = net.cy + r * Math.sin(mid);
+    const text = mod.label.length > 26 ? `${mod.label.slice(0, 24)}…` : mod.label;
+    captionLayer.append(svgEl("text", { class: "module-caption", x: x.toFixed(1),
+      y: (y + 3.5).toFixed(1), "text-anchor": Math.cos(mid) >= 0 ? "start" : "end",
+      fill: apol1ModuleColour(mod.id), opacity: focus ? 0.25 : 1 }, text));
+  }
+  svg.append(captionLayer);
+  return el("div", { class: "chart-box network-box" }, svg);
+}
+
+function apol1Header(key, extra) {
+  const active = apol1Filter.sort === key;
+  const dir = active ? apol1Filter.dir : "desc";
+  return el("th", {
+    class: `num sortable${active ? " sorted" : ""}`,
+    "aria-sort": active ? (dir === "desc" ? "descending" : "ascending") : "none",
+    role: "columnheader", tabindex: "0",
+    title: extra,
+    onclick: () => apol1Sort(key),
+    onkeydown: ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); apol1Sort(key); } },
+  }, APOL1_SORTS[key].label, el("span", { class: "sort-caret" },
+    active ? (dir === "desc" ? "▾" : "▴") : "⇅"));
+}
+
+function apol1Sort(key) {
+  if (apol1Filter.sort === key) apol1Filter.dir = apol1Filter.dir === "desc" ? "asc" : "desc";
+  else { apol1Filter.sort = key; apol1Filter.dir = "desc"; }
+  renderApol1Table();
+}
+
+/* The share column needs an example to land, and the two genes that make it are
+   whichever pair the data currently contrasts hardest: the partner with the
+   highest share against the one with the widest lupus literature. Derived
+   rather than written down, so it survives a weekly refresh. */
+function apol1ShareRationale() {
+  const rows = state.apol1.rows;
+  if (rows.length < 2) return ["Three counts, and the third is the one that matters."];
+  // Not simply the highest share: APOL3 is 2-of-2 and is the very artefact the
+  // paragraph below this one warns about, so an example has to clear a
+  // denominator worth arguing from before it can carry the point.
+  const solid = rows.filter(r => r.lupus_papers >= 5);
+  const specific = (solid.length ? solid : rows)
+    .reduce((a, b) => (b.share_lb > a.share_lb ? b : a));
+  const broad = rows.reduce((a, b) =>
+    (b.lupus_papers > a.lupus_papers && b.symbol !== specific.symbol ? b : a));
+  return [
+    "Three counts, and the third is the one that matters. Raw co-mentions put ",
+    el("strong", {}, specific.symbol), ` (${specific.co_lupus}) near `,
+    el("strong", {}, broad.symbol), ` (${broad.co_lupus}) — but ` +
+    `${specific.co_lupus} of ${specific.symbol}'s ${fmt(specific.lupus_papers)} lupus ` +
+    `papers are APOL1 papers, against ${broad.co_lupus} of ${broad.symbol}'s ` +
+    `${fmt(broad.lupus_papers)}. ${specific.symbol} is an APOL1 partner; ` +
+    `${broad.symbol} co-occurs with everything. Click any column to re-sort. Rows ` +
+    "link to the gene's literature page where it has one; hovering one lights it " +
+    "up on the map.",
+  ];
+}
+
+function renderApol1Table() {
+  const head = document.getElementById("apol1-thead");
+  head.replaceChildren(el("tr", {},
+    el("th", { class: "num" }, "#"),
+    el("th", {}, "Gene"),
+    apol1Header("co_lupus", "Lupus papers that mention this gene and APOL1 together"),
+    apol1Header("lupus_papers", "Every lupus paper mentioning this gene, APOL1 or not"),
+    apol1Header("share", "The first column as a percentage of the second")));
+
+  const rows = apol1SortedRows();
+  const tbody = document.getElementById("apol1-tbody");
+  tbody.replaceChildren(...rows.map((r, i) => {
+    const known = state.geneBySymbol.has(r.symbol);
+    const open = () => known ? showDetail(r.symbol) : null;
+    return el("tr", {
+      class: `gene-row${known ? "" : " inert"}${apol1Filter.focus === r.symbol ? " is-focus" : ""}`,
+      tabindex: known ? "0" : null, role: known ? "button" : null,
+      onmouseenter: () => { apol1Filter.hover = r.symbol; renderApol1Map(); },
+      onmouseleave: () => { apol1Filter.hover = null; renderApol1Map(); },
+      onclick: open,
+      onkeydown: ev => { if (known && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); open(); } } },
+      el("td", { class: "num muted" }, String(i + 1)),
+      el("td", {},
+        el("div", { class: "gene-symbol" }, r.symbol),
+        el("div", { class: "gene-name" }, r.name || "")),
+      el("td", { class: "num" }, fmt(r.co_lupus)),
+      el("td", { class: "num muted" }, fmt(r.lupus_papers)),
+      el("td", { class: "num" },
+        el("div", { class: "score-cell" },
+          el("div", { class: "bar-track" },
+            el("div", { class: "bar-fill", style: `width:${r.share * 100}%` })),
+          el("span", { class: "val" }, `${(r.share * 100).toFixed(1)}%`))));
+  }));
+}
+
+function renderApol1Map() {
+  const host = document.getElementById("apol1-map");
+  if (host) host.replaceChildren(apol1Map());
+  renderApol1Focus();
+}
+
+/* Lives in the controls row, which renderApol1Map does not rebuild, so a click
+   on the map would otherwise dim 93 genes with nothing on screen offering a way
+   back. */
+function renderApol1Focus() {
+  const host = document.getElementById("apol1-focus");
+  if (!host) return;
+  host.replaceChildren(apol1Filter.focus
+    ? el("button", { class: "legend-btn active",
+        onclick: () => { apol1Filter.focus = null; renderApol1Body(); } },
+        `Clear focus: ${apol1Filter.focus} ✕`)
+    : el("span", { class: "count" }, "Click a gene to isolate it"));
+}
+
+function renderApol1Body() {
+  renderApol1Map();
+  renderApol1Table();
+}
+
+function renderApol1View() {
+  const view = document.getElementById("view-apol1");
+  const d = state.apol1;
+  const net = d.network;
+  const innerCount = net.nodes.filter(n => n.ring === "lupus").length;
+  const outerCount = net.nodes.filter(n => n.ring === "apol1").length;
+  const check = (key, label, title) => {
+    const box = el("input", { type: "checkbox",
+      onchange: e => { apol1Filter[key] = e.target.checked; renderApol1Body(); } });
+    box.checked = apol1Filter[key];
+    return el("label", { class: "check", title }, box, label);
+  };
+
+  view.replaceChildren(
+    el("div", { class: "card intro-card" },
+      el("h2", {}, "APOL1 in lupus"),
+      el("p", {},
+        "APOL1 carries two coding variants, ", el("strong", {}, "G1 and G2"),
+        ", that arose under selection for resistance to trypanosomes and now, in two " +
+        "copies, drive progression to kidney failure in people of recent African " +
+        "ancestry. Lupus nephritis is one of the diseases they act on. ",
+        el("strong", {}, "Every other tab on this site is structurally incapable of " +
+        "showing you that."), " APOL1 has " + fmt(d.lupus_articles) + " papers in the " +
+        "lupus corpus, which puts it far outside the top-300 sets the leaderboard and " +
+        "the co-mention map are built on; its Open Targets association with SLE is 0.06; " +
+        "and its lupus papers are spread evenly across 2012–2026, so it fails the " +
+        "concentration test the Emerging tab selects on. It is here because the biology " +
+        "is real, not because it scored well."),
+      el("p", { class: "sub" },
+        "The table below is built only from lupus papers. The map is not, and cannot " +
+        "be: of the " + fmt(d.lupus_articles) + " lupus papers PubTator tags with APOL1, " +
+        "28 name APOL1 and no other gene, which leaves 24 partners, 20 of them seen " +
+        "once, and one partner-partner edge above weight 1. A graph on that is a " +
+        "picture of two abstracts. So the map runs on the whole APOL1 literature — " +
+        fmt(d.corpus_articles) + " papers — and splits it into two rings.")),
+
+    el("div", { class: "kpi-row" },
+      statTile("APOL1 papers", fmt(d.tagged_articles),
+        `PubTator-tagged, of ${fmt(d.corpus_articles)} fetched`),
+      statTile("Inside the lupus corpus", fmt(d.lupus_articles),
+        `${((d.lupus_articles / d.tagged_articles) * 100).toFixed(1)}% of the APOL1 literature`),
+      statTile("Lupus-linked partners", fmt(innerCount),
+        `of ${fmt(d.partners_total)} genes APOL1 is ever co-mentioned with`),
+      statTile("On the outer ring", fmt(outerCount),
+        `${fmt(d.outer_min_co)}+ APOL1 papers, no lupus paper yet`)),
+
+    el("div", { class: "card" },
+      el("h2", {}, "Genes the lupus literature names alongside APOL1"),
+      el("p", { class: "sub" }, ...apol1ShareRationale()),
+      el("p", { class: "sub" },
+        el("strong", {}, "Small denominators."), " A share of 100% here can mean " +
+        "“the only lupus paper naming this gene also named APOL1” — APOL3 " +
+        "and APOL4 are exactly that, and they are neighbouring genes on the same locus " +
+        "picked up by one re-sequencing paper. Ties break on the lower bound of a 95% " +
+        "confidence interval on the share, so 2-of-2 cannot outrank 4-of-7, but the " +
+        "displayed number is the raw one. Read the denominator."),
+      el("div", { class: "table-scroll" },
+        el("table", { class: "data apol1-table" },
+          el("thead", { id: "apol1-thead" }),
+          el("tbody", { id: "apol1-tbody" })))),
+
+    el("div", { class: "card" },
+      el("h2", {}, "Two rings"),
+      el("p", { class: "sub" },
+        "APOL1 at the centre. ", el("strong", {}, "Inner ring: "),
+        "the " + fmt(innerCount) + " genes a lupus paper has already co-mentioned with " +
+        "it. ", el("strong", {}, "Outer ring: "), "the " + fmt(outerCount) +
+        " strongest partners from the wider APOL1 literature that no lupus paper has — " +
+        "drawn hollow, because the connection is established elsewhere and untested " +
+        "here. Each wedge is a community found from the edges and named by g:Profiler, " +
+        "spanning both rings, so an empty inner arc inside a crowded outer wedge is a " +
+        "reading list rather than a decoration."),
+      el("p", { class: "sub" },
+        "Structure comes from the whole APOL1 corpus but the weighting stays anchored " +
+        "to lupus: a co-mention in a lupus paper counts for " + d.lupus_weight +
+        " ordinary ones, both when the pipeline chooses which of the " +
+        fmt(d.outer_eligible) + " eligible partners make the outer ring and when an " +
+        "edge is drawn. Edges with a lupus paper behind them are coloured; " +
+        "partner-partner edges are gated at p < " + d.partner_p + " on a hypergeometric " +
+        "tail, the same test the co-mention map uses."),
+      el("div", { class: "legend" },
+        el("span", {}, el("span", { class: "swatch", style: "background:var(--ink)" }), "APOL1"),
+        el("span", {}, el("span", { class: "swatch apol1-key-inner" }), "lupus-linked (filled)"),
+        el("span", {}, el("span", { class: "swatch apol1-key-outer" }), "APOL1 literature only (hollow)"),
+        el("span", {}, el("span", { class: "key", style: "border-top-color:var(--series-2)" }),
+          "edge with a lupus paper behind it")),
+      el("div", { class: "filter-row" },
+        check("showOuter", "Outer ring", "Hide to see the lupus-linked ring alone"),
+        check("showSpokes", "Spokes to APOL1", "Every partner's edge to the hub"),
+        check("allLabels", "Label every gene", "Off: only the lupus-linked ring is labelled"),
+        el("span", { class: "apol1-focus-slot", id: "apol1-focus" })),
+      el("div", { id: "apol1-map" }),
+      el("p", { class: "sub net-key" },
+        "Dot size is how many APOL1 papers mention the gene. Colour is its wedge. " +
+        "Hover for the counts behind every edge and node.")),
+
+    d.articles.length
+      ? el("div", { class: "card" },
+          el("h2", {}, "The lupus papers"),
+          el("p", { class: "sub" },
+            "All " + fmt(d.articles.length) + " papers in the lupus corpus that PubTator " +
+            "tags with APOL1, newest first. This is a small enough literature to read, " +
+            "which is the honest way to use everything above it."),
+          el("ul", { class: "article-list" },
+            ...d.articles.map(a => el("li", {},
+              el("a", { href: `https://pubmed.ncbi.nlm.nih.gov/${a.pmid}/`,
+                target: "_blank", rel: "noopener" }, a.title || `PMID ${a.pmid}`),
+              el("div", { class: "muted" },
+                `${a.journal || "—"} · ${a.year || "—"}` +
+                (a.genes.length ? ` · also mentions ${a.genes.join(", ")}`
+                                : " · no other gene mentioned"))))))
+      : null,
+  );
+  renderApol1Body();
+}
+
 /* ---------- view switching ---------- */
 function switchView(name, { keepHash } = {}) {
   for (const tab of document.querySelectorAll(".tab")) {
@@ -2642,7 +3058,7 @@ function switchView(name, { keepHash } = {}) {
     tab.classList.toggle("active", active);
     tab.setAttribute("aria-selected", String(active));
   }
-  for (const v of ["genes", "targets", "emerging", "network", "pathways", "compare", "about", "detail"]) {
+  for (const v of ["genes", "targets", "emerging", "network", "apol1", "pathways", "compare", "about", "detail"]) {
     document.getElementById(`view-${v}`).hidden = v !== name;
   }
   if (!keepHash) setHash();   // drops #gene= but preserves any custom weighting
@@ -2650,6 +3066,7 @@ function switchView(name, { keepHash } = {}) {
   if (name === "targets") renderTargetsView();
   if (name === "emerging") renderEmergingView();
   if (name === "network") renderNetworkView();
+  if (name === "apol1") renderApol1View();
   if (name === "pathways") renderPathwaysView();
   if (name === "compare") renderCompareView();
   if (name === "about") renderAboutView();
@@ -2665,8 +3082,8 @@ async function boot() {
       })));
   // Target scoring is a separate pipeline step; the dashboard still works
   // without it, so a missing file hides the tab rather than breaking the page.
-  const [targets, emerging, network] = await Promise.all(
-    ["targets", "emerging", "network"].map(name => fetch(`data/${name}.json`)
+  const [targets, emerging, network, apol1] = await Promise.all(
+    ["targets", "emerging", "network", "apol1"].map(name => fetch(`data/${name}.json`)
       .then(r => (r.ok ? r.json() : null)).catch(() => null)));
   state.genes = genes.genes;
   state.meta = meta;
@@ -2703,6 +3120,13 @@ async function boot() {
     for (const n of network.nodes) state.networkBySymbol.set(n.symbol, n);
   } else if (networkTab) {
     networkTab.remove();
+  }
+
+  const apol1Tab = document.querySelector('.tab[data-view="apol1"]');
+  if (apol1 && apol1.rows.length) {
+    state.apol1 = apol1;
+  } else if (apol1Tab) {
+    apol1Tab.remove();
   }
 
   document.getElementById("loading").remove();

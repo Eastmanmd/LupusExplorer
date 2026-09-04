@@ -199,7 +199,7 @@ def query_gprofiler(query, background=None):
     return grouped
 
 
-def name_modules(modules, background):
+def name_modules(modules, background, cache_file=None):
     """Ask g:Profiler what each module is, in two multi-query requests.
 
     The first uses the network's own gene set as the background, not the genome.
@@ -218,11 +218,12 @@ def name_modules(modules, background):
 
     Cached, because this is the one network step that leaves the machine.
     """
+    cache_file = cache_file or config.NETWORK_MODULES_FILE
     query = {f"m{i}": m for i, m in enumerate(modules) if len(m) >= 3}
     if not query:
         return {}
-    if os.path.exists(config.NETWORK_MODULES_FILE):
-        with open(config.NETWORK_MODULES_FILE) as f:
+    if os.path.exists(cache_file):
+        with open(cache_file) as f:
             cache = json.load(f)
         if cache.get("query") == query:
             print(f"  module labels: cached ({len(cache['labels'])} named)")
@@ -240,7 +241,7 @@ def name_modules(modules, background):
                                "hits": best["intersection_size"],
                                "term_size": best["term_size"], "scope": scope}
                 break
-    with open(config.NETWORK_MODULES_FILE, "w") as f:
+    with open(cache_file, "w") as f:
         json.dump({"query": query, "labels": labels}, f)
     return labels
 
